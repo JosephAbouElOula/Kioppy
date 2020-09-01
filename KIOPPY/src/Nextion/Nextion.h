@@ -1,3 +1,3 @@
 #pragma once
 extern void nextionUartInit();
-extern void lcdSendCommand(String s);
+// extern void lcdSendCommand(String s);

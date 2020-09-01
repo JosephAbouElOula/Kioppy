@@ -2,7 +2,8 @@
 #include "Arduino.h"
 #include "driver/uart.h"
 #include "ArduinoLog.h"
-#include "Nextion/Nextion.h"
+// #include "Nextion/Nextion.h"
+#include "Global.h" 
 
 // #define BARCODE_SERIAL UART_NUM_2
 #define Barcode_Serial Serial2
@@ -46,7 +47,7 @@ static void readBarcodeSerial(void *pvParameters)
         {
             detectedBarcode= Barcode_Serial.readString();
             Log.verbose("Barcode Scanned %S" CR, detectedBarcode.c_str());
-            lcdSendCommand("t1.txt=\"" + detectedBarcode + "\"");
+            lcdSendCommand("t_barcode.txt=\"" + detectedBarcode + "\"");
         }
         vTaskDelay(100 /portTICK_PERIOD_MS);
     }

@@ -18,7 +18,8 @@ typedef struct
 } eventStruct_t;
 
 
-
+enum ScannedMed {TAKE_MED_SCANNED, PUT_MED_SCANNED, NO_MED_SCANNED};
+extern enum ScannedMed scannedMed;
 extern QueueHandle_t monitoringQ;
 
 extern bool fanOn;
@@ -28,6 +29,7 @@ extern EspMQTTClient client;
 
 extern void monitoringQueueAdd(customEvents_t monitor);
 void monitoringQueueAddFromISR(customEvents_t event);
+void lcdSendCommand(String str);
 // extern void setLockCode(String code);
 // extern String lockCode;
 

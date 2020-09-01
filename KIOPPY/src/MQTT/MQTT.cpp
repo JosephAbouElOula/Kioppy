@@ -278,6 +278,26 @@ void onConnectionEstablished()
             const char *barcode = doc["barcode"];
             const char *name = doc["name"];
             const char *type = doc["type"];
+            if (scannedMed == TAKE_MED_SCANNED)
+            {
+                lcdSendCommand("TakeMed.t_barcode.txt=\"" + (String)barcode + "\"");
+                 vTaskDelay(pdMS_TO_TICKS(50));
+                if (type == "Pills")
+                {
+                    lcdSendCommand("TakeMed.t_type.txt=\"Dosage in pills\"");
+                     vTaskDelay(pdMS_TO_TICKS(50));
+                    lcdSendCommand("v_inc.val=25");
+                } else 
+                {
+                    lcdSendCommand("TakeMed.t_type.txt=\"Dosage in ml\"");
+                     vTaskDelay(pdMS_TO_TICKS(50));
+                     lcdSendCommand("v_inc.val=100");
+                }
+                vTaskDelay(pdMS_TO_TICKS(50));
+                lcdSendCommand("TakeMed.v_name.txt=\""+(String)name +"\"");
+                 vTaskDelay(pdMS_TO_TICKS(50));
+                lcdSendCommand("page TakeMed");
+            }
         }
     });
 

@@ -25,6 +25,7 @@ TaskHandle_t lcdUartRxHandle;
 TaskHandle_t lcdUartTxHandle;
 
 String lockCode;
+ScannedMed scannedMed=NO_MED_SCANNED;
 
 void setLockCode(String code)
 {
@@ -68,7 +69,7 @@ void setLockCode(String code)
 // }
 void lcdSendCommand(String str)
 {
-	Log.verbose("Message to Send %s" CR, str.c_str()); // + String ((char) 0xFF + (char) 0xFF + (char) 0xFF ));
+	// Log.verbose("Message to Send %s" CR, str.c_str()); // + String ((char) 0xFF + (char) 0xFF + (char) 0xFF ));
 	// LCD_SERIAL.print(str);
 	xQueueSendToBack(lcdUartTxQueue, &str, portMAX_DELAY);
 }
@@ -86,7 +87,7 @@ static void lcd_uart_tx_task(void *pvParameters)
 			LCD_SERIAL.write(0xFF);
 			LCD_SERIAL.write(0xFF);
 		}
-		vTaskDelay(pdMS_TO_TICKS(100));
+		// vTaskDelay(pdMS_TO_TICKS(100));
 	}
 }
 
@@ -164,7 +165,14 @@ static void lcd_uart_Queue_task(void *pvParameters)
 			case 'S':
 				//Medicine Scanned, waiting for name from Mqtt
 				{
-					Barcode = strData.substring(1);
+					if(strData.charAt(1)=='A'){
+						//Add Med
+						scannedMed=PUT_MED_SCANNED;
+					}else if(strData.charAt(1)=='T'){
+						//Take Med
+						scannedMed=TAKE_MED_SCANNED;
+					}
+					Barcode = strData.substring(2);
 					mqttStruct_t getMedName;
 					getMedName.msgType = SCAN_MED;
 					getMedName.barcode = Barcode;

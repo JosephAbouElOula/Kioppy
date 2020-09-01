@@ -107,7 +107,7 @@ void monitoringTask(void *pvParameters)
         sendDHTtoMqtt = !sendDHTtoMqtt;
         // lcdSendCommand("txtHum.txt=\"" + String(getHum()) + "\"");
         lcdSendCommand("HomeScreen.t_temp.txt=\"" + String(getTemp()) + "\"");
-        vTaskDelay(pdMS_TO_TICKS(150));
+        // vTaskDelay(pdMS_TO_TICKS(50));
         lcdSendCommand("HomeScreen.t_hum.txt=\"" + String(getHum()) + "\"");
 
         if (getTemp() >= TEMP_MAX_THRESHOLD)
