@@ -86,8 +86,8 @@ void hardwareInit()
     // attachInterrupt(DOOR_DET_PIN, doorDetInt, CHANGE);
     doorIntEn();
     doorTimer = xTimerCreate("doorTimer", doorTimeOut / portTICK_PERIOD_MS, pdFALSE, (void *)0, doorTimerCallBack);
-
     nextionUartInit();
     barcodeUartInit();
     initDHT(10);
+    
 }

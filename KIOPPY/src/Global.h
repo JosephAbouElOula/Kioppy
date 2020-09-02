@@ -8,8 +8,7 @@ typedef enum
     MIN_TEMP_REACHED_EVT,
     DHT_TIMER_EVT,
     DOOR_EVT,
-    OPEN_DOOR_EVT,
-    CHANGE_WIFI,
+    NTP_TIMER_EVT
 } customEvents_t;
 
 typedef struct

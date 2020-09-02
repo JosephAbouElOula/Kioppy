@@ -110,8 +110,8 @@ static String structToJson(mqttStruct_t *msg)
         const int capacity = JSON_OBJECT_SIZE(3);
         StaticJsonDocument<capacity> doc;
         doc["msg_type"] = msg->msgType;
-        doc["barcode"] = msg->barcode;
-        doc["exp_date"] = msg->expDate;
+        doc["barcode"] = msg->barcode.c_str();
+        doc["exp_date"] = msg->expDate.c_str();
 
         serializeJson(doc, output);
     }
@@ -120,7 +120,7 @@ static String structToJson(mqttStruct_t *msg)
         const int capacity = JSON_OBJECT_SIZE(3);
         StaticJsonDocument<capacity> doc;
         doc["msg_type"] = msg->msgType;
-        doc["barcode"] = msg->barcode;
+        doc["barcode"] = msg->barcode.c_str();
         doc["qty"] = msg->qty;
 
         serializeJson(doc, output);
@@ -150,8 +150,18 @@ static String structToJson(mqttStruct_t *msg)
     {
         const int capacity = JSON_OBJECT_SIZE(2);
         StaticJsonDocument<capacity> doc;
-        doc["msg_type"] = msg->msgType;
-        doc["barcode"] = msg->barcode;
+        // doc["msg_type"] = msg->msgType;
+        doc["msg_type"].set(msg->msgType);
+        doc["barcode"].set(msg->barcode.c_str());
+        //  Serial.println( msg->barcode);
+        serializeJson(doc, output);
+    }
+    else if (msg->msgType == SCAN_MED)
+    {
+        const int capacity = JSON_OBJECT_SIZE(2);
+        StaticJsonDocument<capacity> doc;
+        doc["msg_type"].set(msg->msgType);
+        doc["barcode"].set(msg->barcode.c_str());
         serializeJson(doc, output);
     }
     return output;
@@ -236,22 +246,30 @@ void mqttTask(void *pvParameters)
     mqttStruct_t mqttReceive;
     while (1)
     {
-        if (xQueueReceive(mqttQ, (void *)&mqttReceive,
-                          (portTickType)portMAX_DELAY))
+        if (client.isConnected())
         {
-            // String payload;
-            // structToJson(&mqttReceive, payload);
 
-            String p = structToJson(&mqttReceive);
+            if (xQueueReceive(mqttQ, (void *)&mqttReceive,
+                              (portTickType)portMAX_DELAY))
+            {
+                // String payload;
+                // structToJson(&mqttReceive, payload);
 
-            //  Log.verbose("send Serialized Data %S" CR, payload.c_str());
-            client.publish(topicName + "/TX", p);
-            vTaskDelay(pdMS_TO_TICKS(100));
-            client.publish("SmartCabinet/12345/TX", p);
+                String p = structToJson(&mqttReceive);
 
-            // esp_mqtt_client_publish(client, "SmartCabinet/12345/TX",
-            //                         payload, 0, 1, 0);
-            // break;
+                Log.verbose("send Serialized Data %S" CR, p.c_str());
+                client.publish(topicName + "/TX", p);
+                // vTaskDelay(pdMS_TO_TICKS(100));
+                // client.publish("SmartCabinet/12345/TX", p);
+
+                // esp_mqtt_client_publish(client, "SmartCabinet/12345/TX",
+                //                         payload, 0, 1, 0);
+                // break;
+            }
+        }
+        else
+        {
+            vTaskDelay(pdMS_TO_TICKS(50));
         }
     }
 }
@@ -273,7 +291,7 @@ void onConnectionEstablished()
         deserializeJson(doc, payload);
 
         uint8_t msgType = doc["msg_type"];
-        if (msgType == 9)
+        if (msgType == MED_DETAILS)
         {
             const char *barcode = doc["barcode"];
             const char *name = doc["name"];
@@ -281,22 +299,39 @@ void onConnectionEstablished()
             if (scannedMed == TAKE_MED_SCANNED)
             {
                 lcdSendCommand("TakeMed.t_barcode.txt=\"" + (String)barcode + "\"");
-                 vTaskDelay(pdMS_TO_TICKS(50));
-                if (type == "Pills")
+                //  vTaskDelay(pdMS_TO_TICKS(50));
+
+                if ((String)type == "pills")
                 {
-                    lcdSendCommand("TakeMed.t_type.txt=\"Dosage in pills\"");
-                     vTaskDelay(pdMS_TO_TICKS(50));
-                    lcdSendCommand("v_inc.val=25");
-                } else 
-                {
-                    lcdSendCommand("TakeMed.t_type.txt=\"Dosage in ml\"");
-                     vTaskDelay(pdMS_TO_TICKS(50));
-                     lcdSendCommand("v_inc.val=100");
+
+                    // lcdSendCommand("TakeMed.t_type.txt=\"Dosage in pills\"");
+                    //  vTaskDelay(pdMS_TO_TICKS(50));
+                    // lcdSendCommand("v_inc.val=25");
+                    lcdSendCommand("TakeMed.v_type.val=0");
                 }
-                vTaskDelay(pdMS_TO_TICKS(50));
-                lcdSendCommand("TakeMed.v_name.txt=\""+(String)name +"\"");
-                 vTaskDelay(pdMS_TO_TICKS(50));
+                else
+                {
+                    // lcdSendCommand("TakeMed.t_type.txt=\"Dosage in ml\"");
+                    //  vTaskDelay(pdMS_TO_TICKS(50));
+                    //  lcdSendCommand("v_inc.val=100");
+                    lcdSendCommand("TakeMed.v_type.val=1");
+                }
+                // vTaskDelay(pdMS_TO_TICKS(50));
+                lcdSendCommand("TakeMed.v_name.txt=\"" + (String)name + "\"");
+                //  vTaskDelay(pdMS_TO_TICKS(50));
                 lcdSendCommand("page TakeMed");
+            }
+            else if (scannedMed == PUT_MED_SCANNED)
+            {
+                if ((String)name == "N/A")
+                {
+                    lcdSendCommand("page MedNotFound");
+                }
+                else
+                {
+                    lcdSendCommand("ExpDate.t_name.txt=\"" + (String)name + "\"");
+                    lcdSendCommand("page ExpDate");
+                }
             }
         }
     });
