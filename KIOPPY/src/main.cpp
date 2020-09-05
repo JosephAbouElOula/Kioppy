@@ -2,13 +2,14 @@
  *  Includes
  */
 #include <ArduinoLog.h>
-// #include <WiFi.h>
+#include <WiFi.h>
 
 #include <SPI.h>
 #include "Hardware\Hardware.h"
 #include "DHT\myDht.h"
 #include "Global.h"
 #include "MQTT\MQTT.h"
+#include "Eeprom\eeprom.h"
 #include "Nextion\Nextion.h"
 #include <NTPClient.h>
 #include <Preferences.h> // WiFi storage
@@ -25,8 +26,7 @@
 QueueHandle_t monitoringQ;
 QueueHandle_t mqttQ;
 bool fanOn = false;
-
-bool boolSmartConfigStop;
+bool blwrEnable = false;
 /*
 * Local Variables
 */
@@ -35,7 +35,8 @@ const char *wpassword = "1122334400";
 const int dhtTimeOut = 30000;
 
 const int ntpTimeout = 15000;
-bool reconnecting = false;
+const int wifiTimeout = 20000;
+
 
 const u_char TEMP_MAX_THRESHOLD = 30;
 const u_char TEMP_MIN_THRESHOLD = 28;
@@ -45,21 +46,23 @@ NTPClient timeClient(ntpUDP); // NTP client
 
 TimerHandle_t dhtTimer;
 TimerHandle_t ntpTimer;
+TimerHandle_t wifiReconnectTimer;
+
 BaseType_t xHigherPriorityTaskWoken;
+EspMQTTClient client(
+    "broker.mqtt-dashboard.com", // MQTT Broker server ip
+    1883,                        // The MQTT port, default to 1883. this line can be omitted
+    "Kioppy"                     // Client name that uniquely identify your device
+);
+
 // EspMQTTClient client(
-//     "5.196.95.208",    // MQTT Broker server ip
-//     1883,              // The MQTT port, default to 1883. this line can be omitted
+//     "dlink-M921-cd6e", //SSID
+//     "9512410909",      //Password
+//     // "5.196.95.208",    // MQTT Broker server ip (test.mosquitto.rog)
+//     "broker.mqtt-dashboard.com",
+//     // 1883,              // The MQTT port, default to 1883. this line can be omitted
 //     "Kioppy" // Client name that uniquely identify your device
 // );
-
-EspMQTTClient client(
-    "dlink-M921-cd6e", //SSID
-    "9512410909",      //Password
-    // "5.196.95.208",    // MQTT Broker server ip (test.mosquitto.rog)
-    "broker.mqtt-dashboard.com",
-    // 1883,              // The MQTT port, default to 1883. this line can be omitted
-    "Kioppy" // Client name that uniquely identify your device
-);
 
 String topicName;
 String months[12] = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
@@ -73,8 +76,15 @@ int currentHour;
 String currentDate;
 String meridiem;
 String currentTime;
+
+bool wifiReconnectReady = true;
+bool wifiMsgQueued=false;
+String wifiSSID;
+String wifiPassword;
+
 void monitoringQueueAdd(customEvents_t event)
 {
+  
   eventStruct_t ev = {.event = event};
   xQueueSendToBack(monitoringQ, &ev, portMAX_DELAY);
 }
@@ -88,7 +98,7 @@ void monitoringTask(void *pvParameters)
 {
   Log.verbose("Monitoring Taks" CR);
   eventStruct_t eventReceive;
-  bool sendDHTtoMqtt = false;
+  bool sendDHTtoMqtt = true;
   int timeSent = 0; //handle door debounce msgs
   while (1)
   {
@@ -99,7 +109,7 @@ void monitoringTask(void *pvParameters)
       case MAX_TEMP_REACHED_EVT:
       {
         Log.verbose("Max Temp Reached" CR);
-        if (!fanOn)
+        if (!fanOn && blwrEnable == 1)
         {
           turnFanOn();
         }
@@ -192,8 +202,9 @@ void monitoringTask(void *pvParameters)
         else
         {
           lcdSendCommand("HomeScreen.v_wifi.val=0");
+          monitoringQueueAdd(WIFI_RECOONECT_EVT);
         }
-vTaskDelay(pdMS_TO_TICKS(150));
+        vTaskDelay(pdMS_TO_TICKS(150));
         epochTime = timeClient.getEpochTime();
         ptm = gmtime((time_t *)&epochTime);
         monthDay = ptm->tm_mday;
@@ -224,9 +235,19 @@ vTaskDelay(pdMS_TO_TICKS(150));
         currentTime = (String)currentHour + ":" + (String)min + " " + meridiem;
         lcdSendCommand("HomeScreen.t_time.txt=\"" + currentTime + "\"");
         xTimerStart(ntpTimer, 0);
-
+        // monitoringQueueAdd(WIFI_RECOONECT_EVT);
+        // WiFi.begin(SSID.c_str(),Password.c_str());
         break;
       }
+      case WIFI_RECOONECT_EVT:
+        if (wifiReconnectReady && !client.isConnected())
+        {
+          Log.verbose("Trying to reconnect" CR);
+          wifiReconnectReady=false;
+          xTimerStart(wifiReconnectTimer, 0);
+          WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
+        }
+        break;
       default:
         break;
       }
@@ -241,10 +262,17 @@ void IRAM_ATTR dhtTimerCallBack(TimerHandle_t dhtTimer)
   monitoringQueueAdd(DHT_TIMER_EVT);
 }
 
+void IRAM_ATTR wifiReconnectTimerCallback(TimerHandle_t wifiReconnectTimer)
+{
+  wifiReconnectReady=true;
+  wifiMsgQueued=false;
+}
+
 void IRAM_ATTR ntpTimerCallback(TimerHandle_t ntpTimer)
 {
   monitoringQueueAdd(NTP_TIMER_EVT);
 }
+
 void printTimestamp(Print *_logOutput)
 {
   char c[12];
@@ -263,57 +291,52 @@ void setup()
 
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
   Log.setPrefix(printTimestamp);
-
-  // Barcode_Serial.begin(9600, SERIAL_8N1, Barcode_RX, Barcode_TX);
+  EEPROM.begin(512);
 
   hardwareInit();
+  // writeStringToEEPROM(6,"hs1");
+  // writeStringToEEPROM(40,"1122334400");
+
+  wifiSSID = readStringFromEEPROM(SSID_ADDRESS);
+  wifiPassword = readStringFromEEPROM(PASSWORD_ADDRESS);
+  // Serial.println(wifiPassword);
+  if (wifiSSID == "")
+  {
+    wifiSSID = "hs1";
+  }
+
+  if (wifiPassword == "")
+  {
+    wifiPassword = "1122334400";
+  }
+
   monitoringQ = xQueueCreate(10, sizeof(eventStruct_t));
   mqttQ = xQueueCreate(10, sizeof(mqttStruct_t));
   dhtTimer = xTimerCreate("dhtTimer", dhtTimeOut / portTICK_PERIOD_MS, pdFALSE, (void *)0, dhtTimerCallBack);
-  ntpTimer = xTimerCreate("wifi timer", ntpTimeout / portTICK_PERIOD_MS, pdFALSE, (void *)0, ntpTimerCallback);
+  ntpTimer = xTimerCreate("NTP timer", ntpTimeout / portTICK_PERIOD_MS, pdFALSE, (void *)0, ntpTimerCallback);
+  wifiReconnectTimer = xTimerCreate("WiFi Timer", wifiTimeout / portTICK_PERIOD_MS, pdFALSE, (void *)0, wifiReconnectTimerCallback);
 
   client.enableDebuggingMessages();
   Log.verbose("Setup Done!" CR);
-
-  // // wifiInit();
-  // WiFi.setAutoReconnect(true);
-  // WiFi.begin(ssid, wpassword);
-  // Log.verbose("Connecting to %s..." CR, ssid);
-  // long i = 0;
-  // while (WiFi.status() != WL_CONNECTED && i < 100)
-  // {
-  //   i++;
-  //   vTaskDelay(pdMS_TO_TICKS(100));
-  //   // delay(100);
-  // }
-
-  // if (i < 200)
-  // {
-  //   Log.verbose("Wifi Connected!" CR);
-  // }
+  // Serial.println(wifiPassword);
+  // Serial.println(wifiPassword);
+  WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
+  // WiFi.begin("hs1", "1122334400");
   topicName = "Kioppy/" + WiFi.macAddress();
-  // Log.verbose("Topic %s" CR, topicName.c_str()); FC:F5:C4:05:A5:F4
 
   xTaskCreate(monitoringTask, "MonitoringTask", configMINIMAL_STACK_SIZE * 3, NULL, 5, NULL);
   createMqttTask();
-  // monitoringQueueAdd(CHANGE_WIFI);
 
   xTimerStart(dhtTimer, 0);
   vTaskDelay(pdMS_TO_TICKS(250));
   monitoringQueueAdd(DHT_TIMER_EVT);
-
-  // monitoringQueueAdd(CHANGE_WIFI);
 }
 bool ntpBgun = false;
 void loop()
 {
-  //  if (!client.isConnected() && !reconnecting){
-  //    Log.verbose("Reconnecting..." CR);
-  //    reconnecting=true;
-  //    WiFi.reconnect();
-  //    xTimerStart(wifiReconnectTimer, 0);
-  //  }
+
   client.loop();
+
   if (!ntpBgun && client.isWifiConnected())
   {
     timeClient.begin();              // init NTP
@@ -323,23 +346,9 @@ void loop()
     monitoringQueueAdd(NTP_TIMER_EVT);
     // xTimerStart(ntpTimer, 0);
   }
-  // if (!boolStopMqtt)
-  // {
 
-  // }
-
-  /*
-LCD_SERIAL.println("LCD Serial");
-Barcode_Serial.println("Barcode Serial");
-  while (Barcode_Serial.available()) {
-    Serial.print(char(Barcode_Serial.read()));
+  if (!client.isConnected() && wifiReconnectReady && !wifiMsgQueued)
+  {     wifiMsgQueued=true;
+        monitoringQueueAdd(WIFI_RECOONECT_EVT);
   }
-
-   float t = getDhtData().temperature;
-   float h = getHum();
-  Log.verbose("Temp: %F, Hum: %F" CR ,t,h);
-fanOff();
-delay(5000);
-fanOn();
-delay(5000);*/
 }

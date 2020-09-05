@@ -15,8 +15,7 @@
 #define LCD_UART_QUEUE_SIZE 32
 #define LCD_RECEIVE_TASK_PRIORITY 1
 #define LCD_TRANSMIT_TASK_PRIORITY 2
-#define SETUP_ADDRESS 1
-#define LOCK_CODE_ADDRESS 2
+
 
 QueueHandle_t lcdUartRxQueue;
 QueueHandle_t lcdUartTxQueue;
@@ -76,7 +75,7 @@ void lcdSendCommand(String str)
 
 static void lcd_uart_tx_task(void *pvParameters)
 {
-	String strCommand="";
+	String strCommand = "";
 
 	while (1)
 	{
@@ -87,7 +86,6 @@ static void lcd_uart_tx_task(void *pvParameters)
 			LCD_SERIAL.write(0xFF);
 			LCD_SERIAL.write(0xFF);
 			LCD_SERIAL.write(0xFF);
-			
 		}
 		// vTaskDelay(pdMS_TO_TICKS(100));
 	}
@@ -100,10 +98,10 @@ static void lcd_uart_Queue_task(void *pvParameters)
 	String strData;
 	static String Barcode;
 
+	// static String SSID;
+	// static String PWD;
+
 	String qty;
-	// static char data[LCD_UART_BUFFER_SIZE] = {0};
-	char nextScreen = 'X';
-	int intNewCode = 0;
 
 	while (1)
 	{
@@ -187,155 +185,192 @@ static void lcd_uart_Queue_task(void *pvParameters)
 				getMedName.barcode = Barcode;
 				xQueueSendToBack(mqttQ, &getMedName, portMAX_DELAY);
 			}
+
+			else if (strData.charAt(0) == 'W')
+			{
+				//SSID
+				wifiSSID = strData.substring(1);
+			}
+			else if (strData.charAt(0) == 'P')
+			{
+				//Wifi Password
+				wifiPassword = strData.substring(1);
+				writeStringToEEPROM(SSID_ADDRESS, wifiSSID);
+				writeStringToEEPROM(PASSWORD_ADDRESS, wifiPassword);
+				monitoringQueueAdd(WIFI_RECOONECT_EVT);
+				// WiFi.begin(SSID.c_str(), PWD.c_str());
+			}
+			else if (strData.charAt(0) == 'F')
+			{
+				//Factory Reset
+				EEPROM.write(SETUP_ADDRESS, 1);
+				EEPROM.commit();
+				ESP.restart();
+			}
+			else if (strData.charAt(0)=='B'){
+				//Blower
+				if (strData.charAt(1)=='E'){
+					EEPROM.write(BLOWER_ADDRESS,1);
+					EEPROM.commit();
+					// blwrEnable=1;
+				} else {
+					Serial.println("Here");
+					EEPROM.write(BLOWER_ADDRESS,0);
+					EEPROM.commit();
+					// blwrEnable=0;
+					turnFanOff();
+				}
+				
+			}
 		}
-
-		// switch (strData.charAt(0))
-		// {
-		// case 'M':
-		// {
-		// 	// Main Screen
-		// 	nextScreen = strData.charAt(1);
-
-		// 	if (nextScreen == 'C')
-		// 	{
-		// 		//Change Code screen
-		// 		lcdSendCommand("page 1");
-		// 	}
-		// 	else if (nextScreen == 'W')
-		// 	{
-		// 		// monitoringQueueAdd(CHANGE_WIFI);
-		// 	}
-		// 	else
-		// 	{
-		// 		if (doorIsOpen())
-		// 		{
-		// 			if (nextScreen == 'T')
-		// 			{
-		// 				lcdSendCommand("page Take_Med");
-		// 			}
-		// 			else if (nextScreen == 'A')
-		// 			{
-		// 				lcdSendCommand("page Add_Med");
-		// 			}
-		// 			else
-		// 			{
-		// 				Log.error("Unknown Command from Nextion");
-		// 			}
-		// 		}
-		// 		else
-		// 		{
-		// 			//Door is closed
-		// 			lcdSendCommand("page 1");
-		// 		}
-		// 	}
-		// 	break;
-		// }
-
-		// case 'C':
-		// {
-		// 	/* code */
-		// 	if (nextScreen == 'C')
-		// 	{
-		// 		//change code
-		// 		if (intNewCode == 0)
-		// 		{
-		// 			lcdSendCommand("t5.txt=\"Enter your new Code and press 'OK'\"");
-		// 			lcdSendCommand("t0.txt=\"\"");
-		// 			intNewCode++;
-		// 		}
-		// 		else if (intNewCode == 1)
-		// 		{
-		// 			lcdSendCommand("t5.txt=\"Re-enter your new Code and press 'OK'\"");
-		// 			lcdSendCommand("t0.txt=\"\"");
-		// 			newCode = strData.substring(1);
-		// 			Log.verbose("New Code %s" CR, newCode.c_str());
-		// 			intNewCode++;
-		// 		}
-		// 		else if (intNewCode == 2)
-		// 		{
-		// 			Log.verbose("Pftt %s, %s" CR, newCode, strData.substring(1).c_str());
-		// 			if (strData.substring(1).equals(newCode))
-		// 			{
-		// 				//code was changed
-		// 				lcdSendCommand("page Code_Changed");
-		// 				setLockCode(newCode);
-		// 				intNewCode = 0;
-		// 			}
-		// 			else
-		// 			{
-		// 				Log.verbose("New Code %s" CR, strData.substring(1).c_str());
-		// 				lcdSendCommand("page Code_Error");
-		// 				// lcdSendCommand("t0.txt=\"Codes do not match!\"");
-		// 			}
-		// 		}
-		// 	}
-		// 	else if (strData.substring(1).equals(lockCode))
-		// 	{
-		// 		//Code is correct
-
-		// 		if (nextScreen == 'A')
-		// 		{
-		// 			unlockDoor();
-		// 			lcdSendCommand("page Add_Med");
-		// 		}
-		// 		else if (nextScreen == 'T')
-		// 		{
-		// 			unlockDoor();
-		// 			lcdSendCommand("page Take_Med");
-		// 		}
-		// 	}
-		// 	else
-		// 	{
-
-		// 		lcdSendCommand("t0.txt=\"\"");
-		// 		lcdSendCommand("va1.val=0");
-		// 		// lcdSendCommand("va0.txt=\"C" + (String)strData.charAt(1) + "\"");
-		// 		lcdSendCommand("vis t1,1");
-		// 	}
-		// 	break;
-		// }
-
-		// case 'A':
-		// {
-		// 	Barcode = strData.substring(1, strData.indexOf(';') - 1);
-		// 	expDate = (strData.substring(strData.indexOf(';') + 1));
-		// 	// Log.verbose("Index %d" CR, strData.indexOf(';'));
-		// 	// Log.verbose("exp Date %s" CR,strData.substring(strData.indexOf(';') + 1));
-		// 	mqttStruct_t putMedicine;
-		// 	putMedicine.msgType = PUT_MED; //msgType
-		// 	// strcpy(putMedicine.barcode, Barcode.c_str()); //barcode
-		// 	// strcpy(putMedicine.expDate, expDate.c_str()); //expDate
-		// 	putMedicine.barcode = Barcode;
-		// 	putMedicine.expDate = expDate;
-		// 	xQueueSendToBack(mqttQ, &putMedicine, portMAX_DELAY);
-		// 	break;
-		// }
-
-		// case 'T':
-		// {
-		// 	Barcode = strData.substring(1, strData.indexOf(';') - 1);
-		// 	qty = (strData.substring(strData.indexOf(';') + 1)).toInt();
-		// 	mqttStruct_t takeMedicine;
-		// 	takeMedicine.msgType = TAKE_MED; //msgType
-		// 	// strcpy(takeMedicine.barcode, Barcode.c_str()); //barcode
-		// 	takeMedicine.barcode = Barcode;
-		// 	takeMedicine.qty = qty;
-		// 	xQueueSendToBack(mqttQ, &takeMedicine, portMAX_DELAY);
-		// 	break;
-		// }
-
-		// case 'S':
-		// {
-		// 	//Smart Config Stop
-		// 	boolSmartConfigStop = true;
-		// 	break;
-		// }
-		// default:
-		// {
-		// 	break;
-		// }
-		// }
 	}
+
+	// switch (strData.charAt(0))
+	// {
+	// case 'M':
+	// {
+	// 	// Main Screen
+	// 	nextScreen = strData.charAt(1);
+
+	// 	if (nextScreen == 'C')
+	// 	{
+	// 		//Change Code screen
+	// 		lcdSendCommand("page 1");
+	// 	}
+	// 	else if (nextScreen == 'W')
+	// 	{
+	// 		// monitoringQueueAdd(CHANGE_WIFI);
+	// 	}
+	// 	else
+	// 	{
+	// 		if (doorIsOpen())
+	// 		{
+	// 			if (nextScreen == 'T')
+	// 			{
+	// 				lcdSendCommand("page Take_Med");
+	// 			}
+	// 			else if (nextScreen == 'A')
+	// 			{
+	// 				lcdSendCommand("page Add_Med");
+	// 			}
+	// 			else
+	// 			{
+	// 				Log.error("Unknown Command from Nextion");
+	// 			}
+	// 		}
+	// 		else
+	// 		{
+	// 			//Door is closed
+	// 			lcdSendCommand("page 1");
+	// 		}
+	// 	}
+	// 	break;
+	// }
+
+	// case 'C':
+	// {
+	// 	/* code */
+	// 	if (nextScreen == 'C')
+	// 	{
+	// 		//change code
+	// 		if (intNewCode == 0)
+	// 		{
+	// 			lcdSendCommand("t5.txt=\"Enter your new Code and press 'OK'\"");
+	// 			lcdSendCommand("t0.txt=\"\"");
+	// 			intNewCode++;
+	// 		}
+	// 		else if (intNewCode == 1)
+	// 		{
+	// 			lcdSendCommand("t5.txt=\"Re-enter your new Code and press 'OK'\"");
+	// 			lcdSendCommand("t0.txt=\"\"");
+	// 			newCode = strData.substring(1);
+	// 			Log.verbose("New Code %s" CR, newCode.c_str());
+	// 			intNewCode++;
+	// 		}
+	// 		else if (intNewCode == 2)
+	// 		{
+	// 			Log.verbose("Pftt %s, %s" CR, newCode, strData.substring(1).c_str());
+	// 			if (strData.substring(1).equals(newCode))
+	// 			{
+	// 				//code was changed
+	// 				lcdSendCommand("page Code_Changed");
+	// 				setLockCode(newCode);
+	// 				intNewCode = 0;
+	// 			}
+	// 			else
+	// 			{
+	// 				Log.verbose("New Code %s" CR, strData.substring(1).c_str());
+	// 				lcdSendCommand("page Code_Error");
+	// 				// lcdSendCommand("t0.txt=\"Codes do not match!\"");
+	// 			}
+	// 		}
+	// 	}
+	// 	else if (strData.substring(1).equals(lockCode))
+	// 	{
+	// 		//Code is correct
+
+	// 		if (nextScreen == 'A')
+	// 		{
+	// 			unlockDoor();
+	// 			lcdSendCommand("page Add_Med");
+	// 		}
+	// 		else if (nextScreen == 'T')
+	// 		{
+	// 			unlockDoor();
+	// 			lcdSendCommand("page Take_Med");
+	// 		}
+	// 	}
+	// 	else
+	// 	{
+
+	// 		lcdSendCommand("t0.txt=\"\"");
+	// 		lcdSendCommand("va1.val=0");
+	// 		// lcdSendCommand("va0.txt=\"C" + (String)strData.charAt(1) + "\"");
+	// 		lcdSendCommand("vis t1,1");
+	// 	}
+	// 	break;
+	// }
+
+	// case 'A':
+	// {
+	// 	Barcode = strData.substring(1, strData.indexOf(';') - 1);
+	// 	expDate = (strData.substring(strData.indexOf(';') + 1));
+	// 	// Log.verbose("Index %d" CR, strData.indexOf(';'));
+	// 	// Log.verbose("exp Date %s" CR,strData.substring(strData.indexOf(';') + 1));
+	// 	mqttStruct_t putMedicine;
+	// 	putMedicine.msgType = PUT_MED; //msgType
+	// 	// strcpy(putMedicine.barcode, Barcode.c_str()); //barcode
+	// 	// strcpy(putMedicine.expDate, expDate.c_str()); //expDate
+	// 	putMedicine.barcode = Barcode;
+	// 	putMedicine.expDate = expDate;
+	// 	xQueueSendToBack(mqttQ, &putMedicine, portMAX_DELAY);
+	// 	break;
+	// }
+
+	// case 'T':
+	// {
+	// 	Barcode = strData.substring(1, strData.indexOf(';') - 1);
+	// 	qty = (strData.substring(strData.indexOf(';') + 1)).toInt();
+	// 	mqttStruct_t takeMedicine;
+	// 	takeMedicine.msgType = TAKE_MED; //msgType
+	// 	// strcpy(takeMedicine.barcode, Barcode.c_str()); //barcode
+	// 	takeMedicine.barcode = Barcode;
+	// 	takeMedicine.qty = qty;
+	// 	xQueueSendToBack(mqttQ, &takeMedicine, portMAX_DELAY);
+	// 	break;
+	// }
+
+	// case 'S':
+	// {
+	// 	//Smart Config Stop
+	// 	boolSmartConfigStop = true;
+	// 	break;
+	// }
+	// default:
+	// {
+	// 	break;
+	// }
+	// }
 }
 
 static void readLCDSerial(void *pvParameters)

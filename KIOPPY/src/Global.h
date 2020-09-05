@@ -2,13 +2,23 @@
 #include "Arduino.h"
 #include "EspMQTTClient.h"
 #include "esp_log.h"
+
+#define SETUP_ADDRESS 1
+#define LOCK_CODE_ADDRESS 2 //1+1
+#define BLOWER_ADDRESS 6 //2+4
+#define SSID_ADDRESS 10
+#define PASSWORD_ADDRESS 50
+
+extern bool blwrEnable; 
+
 typedef enum
 {
     MAX_TEMP_REACHED_EVT = 0,
     MIN_TEMP_REACHED_EVT,
     DHT_TIMER_EVT,
     DOOR_EVT,
-    NTP_TIMER_EVT
+    NTP_TIMER_EVT,
+    WIFI_RECOONECT_EVT
 } customEvents_t;
 
 typedef struct
@@ -22,6 +32,9 @@ extern enum ScannedMed scannedMed;
 extern QueueHandle_t monitoringQ;
 
 extern bool fanOn;
+
+extern String wifiSSID;
+extern String wifiPassword;
 
 extern EspMQTTClient client;
 
