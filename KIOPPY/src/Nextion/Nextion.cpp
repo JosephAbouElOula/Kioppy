@@ -212,12 +212,12 @@ static void lcd_uart_Queue_task(void *pvParameters)
 				if (strData.charAt(1)=='E'){
 					EEPROM.write(BLOWER_ADDRESS,1);
 					EEPROM.commit();
-					// blwrEnable=1;
+					blwrEnable=1;
 				} else {
 					Serial.println("Here");
 					EEPROM.write(BLOWER_ADDRESS,0);
 					EEPROM.commit();
-					// blwrEnable=0;
+					blwrEnable=0;
 					turnFanOff();
 				}
 				
