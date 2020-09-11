@@ -27,6 +27,7 @@ typedef enum
     REMOVE_MED,
     SCAN_MED,
     MED_DETAILS,
+    PHONE_CONNECTED,
 } mqttMsgType_t;
 
 extern QueueHandle_t mqttQ;

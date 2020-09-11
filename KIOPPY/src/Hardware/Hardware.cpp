@@ -12,7 +12,7 @@
 /*
 * defines
 */
-#define FAN_PIN 33
+#define FAN_PIN 27
 #define LOCK_PIN 32
 #define DOOR_DET_PIN 26
 
@@ -27,14 +27,14 @@ bool doorOpen = false;
 
 void turnFanOff()
 {
-    Serial.println("Fan OFF");
+    // Serial.println("Fan OFF");
     digitalWrite(FAN_PIN, 0);
     fanOn = false;
 }
 
 void turnFanOn()
 {
-    Serial.println("Fan On");
+    // Serial.println("Fan On");
     digitalWrite(FAN_PIN, 1);
     fanOn = true;
 }

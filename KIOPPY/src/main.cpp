@@ -27,6 +27,7 @@ QueueHandle_t monitoringQ;
 QueueHandle_t mqttQ;
 bool fanOn = false;
 bool blwrEnable = false;
+bool cancelScan=false;
 /*
 * Local Variables
 */
@@ -36,7 +37,7 @@ const int dhtTimeOut = 30000;
 
 const int ntpTimeout = 15000;
 const int wifiTimeout = 20000;
-
+const int mobileTimeout = 90000;
 
 const u_char TEMP_MAX_THRESHOLD = 30;
 const u_char TEMP_MIN_THRESHOLD = 28;
@@ -47,6 +48,8 @@ NTPClient timeClient(ntpUDP); // NTP client
 TimerHandle_t dhtTimer;
 TimerHandle_t ntpTimer;
 TimerHandle_t wifiReconnectTimer;
+
+TimerHandle_t mobileConnectedTimer;
 
 BaseType_t xHigherPriorityTaskWoken;
 EspMQTTClient client(
@@ -90,7 +93,7 @@ void monitoringQueueAdd(customEvents_t event)
 }
 void monitoringQueueAddFromISR(customEvents_t event)
 {
-  eventStruct_t ev = {.event = DOOR_EVT};
+  eventStruct_t ev = {.event = event};
   xQueueSendToBackFromISR(monitoringQ, &ev, &xHigherPriorityTaskWoken);
 }
 
@@ -131,9 +134,9 @@ void monitoringTask(void *pvParameters)
         sendDHTtoMqtt = !sendDHTtoMqtt;
 
         lcdSendCommand("HomeScreen.t_temp.txt=\"" + String(getTemp()) + "\"");
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(150));
         lcdSendCommand("HomeScreen.t_hum.txt=\"" + String(getHum()) + "\"");
-
+ vTaskDelay(pdMS_TO_TICKS(150));
         if (getTemp() >= TEMP_MAX_THRESHOLD)
         {
           // Log.verbose("MAX TEMP REACHED" CR);
@@ -197,15 +200,20 @@ void monitoringTask(void *pvParameters)
       {
         if (client.isConnected())
         {
-          lcdSendCommand("HomeScreen.v_wifi.val=1");
+                   lcdSendCommand("HomeScreen.v_wifi.val=1");
         }
         else
         {
           lcdSendCommand("HomeScreen.v_wifi.val=0");
           monitoringQueueAdd(WIFI_RECOONECT_EVT);
         }
+        
         vTaskDelay(pdMS_TO_TICKS(150));
+           if(client.isWifiConnected()){
+          timeClient.forceUpdate();
+          }
         epochTime = timeClient.getEpochTime();
+        if(epochTime>1599423864){
         ptm = gmtime((time_t *)&epochTime);
         monthDay = ptm->tm_mday;
         currentMonthName = months[ptm->tm_mon];
@@ -234,6 +242,7 @@ void monitoringTask(void *pvParameters)
         sprintf(min, "%02d", currentMinute);
         currentTime = (String)currentHour + ":" + (String)min + " " + meridiem;
         lcdSendCommand("HomeScreen.t_time.txt=\"" + currentTime + "\"");
+        }
         xTimerStart(ntpTimer, 0);
         // monitoringQueueAdd(WIFI_RECOONECT_EVT);
         // WiFi.begin(SSID.c_str(),Password.c_str());
@@ -248,6 +257,18 @@ void monitoringTask(void *pvParameters)
           WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
         }
         break;
+        
+        case MOBILE_DISCONNECTED_EVT:
+          xTimerStart(mobileConnectedTimer,0);
+          lcdSendCommand("HomeScreen.v_mobile.val=0");
+            vTaskDelay(pdMS_TO_TICKS(150));
+        break;
+
+        case MOBILE_CONNECTED_EVT:
+          xTimerStart(mobileConnectedTimer,0);
+         lcdSendCommand("HomeScreen.v_mobile.val=1");
+           vTaskDelay(pdMS_TO_TICKS(150));
+         break;
       default:
         break;
       }
@@ -259,7 +280,14 @@ void IRAM_ATTR dhtTimerCallBack(TimerHandle_t dhtTimer)
   // Log.verbose("DHT Timer Callback" CR);
   /*eventStruct_t ev = {.event = DHT_TIMER_EVT};
   xQueueSendToBackFromISR(monitoringQ, &ev, &xHigherPriorityTaskWoken);*/
-  monitoringQueueAdd(DHT_TIMER_EVT);
+  monitoringQueueAddFromISR(DHT_TIMER_EVT);
+}
+
+
+void IRAM_ATTR mobileTimerCallback(TimerHandle_t mobileConnectedTimer)
+{
+
+  monitoringQueueAddFromISR(MOBILE_DISCONNECTED_EVT);
 }
 
 void IRAM_ATTR wifiReconnectTimerCallback(TimerHandle_t wifiReconnectTimer)
@@ -270,7 +298,7 @@ void IRAM_ATTR wifiReconnectTimerCallback(TimerHandle_t wifiReconnectTimer)
 
 void IRAM_ATTR ntpTimerCallback(TimerHandle_t ntpTimer)
 {
-  monitoringQueueAdd(NTP_TIMER_EVT);
+  monitoringQueueAddFromISR(NTP_TIMER_EVT);
 }
 
 void printTimestamp(Print *_logOutput)
@@ -299,6 +327,8 @@ void setup()
 
   wifiSSID = readStringFromEEPROM(SSID_ADDRESS);
   wifiPassword = readStringFromEEPROM(PASSWORD_ADDRESS);
+  EEPROM.write(6,0x00);
+  EEPROM.commit();
   // Serial.println(wifiPassword);
   if (wifiSSID == "")
   {
@@ -315,6 +345,9 @@ void setup()
   dhtTimer = xTimerCreate("dhtTimer", dhtTimeOut / portTICK_PERIOD_MS, pdFALSE, (void *)0, dhtTimerCallBack);
   ntpTimer = xTimerCreate("NTP timer", ntpTimeout / portTICK_PERIOD_MS, pdFALSE, (void *)0, ntpTimerCallback);
   wifiReconnectTimer = xTimerCreate("WiFi Timer", wifiTimeout / portTICK_PERIOD_MS, pdFALSE, (void *)0, wifiReconnectTimerCallback);
+  mobileConnectedTimer=xTimerCreate("Mobile Timer",mobileTimeout/ portTICK_PERIOD_MS, pdFALSE, (void *)0, mobileTimerCallback);
+
+
 
   client.enableDebuggingMessages();
   Log.verbose("Setup Done!" CR);

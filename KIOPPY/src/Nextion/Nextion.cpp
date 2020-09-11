@@ -130,7 +130,7 @@ static void lcd_uart_Queue_task(void *pvParameters)
 			else if (strData.charAt(0) == 'R')
 			{
 				//Remove medicine from the cabinet
-				Barcode = strData.substring(1);
+				Barcode = strData.substring(1,strData.length()-1);
 				mqttStruct_t removeMedicine;
 				removeMedicine.msgType = REMOVE_MED;
 				removeMedicine.barcode = Barcode;
@@ -165,7 +165,7 @@ static void lcd_uart_Queue_task(void *pvParameters)
 			}
 			else if (strData.charAt(0) == 'S')
 			{
-
+				cancelScan=false;
 				//Medicine Scanned, waiting for name from Mqtt
 
 				if (strData.charAt(1) == 'A')
@@ -178,7 +178,7 @@ static void lcd_uart_Queue_task(void *pvParameters)
 					//Take Med
 					scannedMed = TAKE_MED_SCANNED;
 				}
-				Barcode = strData.substring(2);
+				Barcode = strData.substring(2,strData.length()-1);
 
 				mqttStruct_t getMedName;
 				getMedName.msgType = SCAN_MED;
@@ -203,6 +203,7 @@ static void lcd_uart_Queue_task(void *pvParameters)
 			else if (strData.charAt(0) == 'F')
 			{
 				//Factory Reset
+				EEPROM.write(BLOWER_ADDRESS,1);
 				EEPROM.write(SETUP_ADDRESS, 1);
 				EEPROM.commit();
 				ESP.restart();
@@ -214,13 +215,16 @@ static void lcd_uart_Queue_task(void *pvParameters)
 					EEPROM.commit();
 					blwrEnable=1;
 				} else {
-					Serial.println("Here");
+					
 					EEPROM.write(BLOWER_ADDRESS,0);
 					EEPROM.commit();
 					blwrEnable=0;
 					turnFanOff();
 				}
 				
+			}else if(strData.charAt(0)=='C'){
+				//Cancel Scan
+				cancelScan=true;
 			}
 		}
 	}
@@ -410,7 +414,9 @@ void nextionUartInit(void)
 	Log.verbose("Needs Setup %d" CR, needs_setup);
 
 	lcdSendCommand("needs_setup.val=" + String(needs_setup));
-	vTaskDelay(pdMS_TO_TICKS(150));
+	vTaskDelay(pdMS_TO_TICKS(350));
+		lcdSendCommand("needs_setup.val=" + String(needs_setup));
+		vTaskDelay(pdMS_TO_TICKS(150));
 	if (!needs_setup)
 	{
 		//read the stored code in the EEPROM

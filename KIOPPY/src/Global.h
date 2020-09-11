@@ -5,12 +5,12 @@
 
 #define SETUP_ADDRESS 1
 #define LOCK_CODE_ADDRESS 2 //1+1
-#define BLOWER_ADDRESS 6 //2+4
+#define BLOWER_ADDRESS 7 //2+4
 #define SSID_ADDRESS 10
 #define PASSWORD_ADDRESS 50
 
 extern bool blwrEnable; 
-
+extern bool cancelScan;
 typedef enum
 {
     MAX_TEMP_REACHED_EVT = 0,
@@ -18,7 +18,9 @@ typedef enum
     DHT_TIMER_EVT,
     DOOR_EVT,
     NTP_TIMER_EVT,
-    WIFI_RECOONECT_EVT
+    WIFI_RECOONECT_EVT,
+    MOBILE_DISCONNECTED_EVT,
+    MOBILE_CONNECTED_EVT
 } customEvents_t;
 
 typedef struct

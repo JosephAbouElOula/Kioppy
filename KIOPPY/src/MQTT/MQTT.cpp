@@ -92,42 +92,134 @@ uint8_t jsonDeserializer(const char *jsonStr, const char *barcode, const char *n
 }
 char booltochar[2][6] = {"false", "true"};
 
-static String structToJson(mqttStruct_t *msg)
+//  String structToJson(mqttStruct_t *msg)
+// {
+
+//     String output="";
+
+//     if (msg->msgType == DOOR)
+//     {
+//         const int capacity = JSON_OBJECT_SIZE(2);
+//         StaticJsonDocument<capacity> doc;
+//         doc["msg_type"] = msg->msgType;
+//         doc["open"] = msg->open;
+//         serializeJson(doc, output);
+//     }
+//     else if (msg->msgType == PUT_MED)
+//     {
+//         const int capacity = JSON_OBJECT_SIZE(3);
+//         StaticJsonDocument<capacity> doc;
+//         doc["msg_type"] = msg->msgType;
+//         doc["barcode"] = msg->barcode;
+//         doc["exp_date"] = msg->expDate.c_str();
+
+//         serializeJson(doc, output);
+//     }
+//     else if (msg->msgType == TAKE_MED)
+//     {
+//         const int capacity = JSON_OBJECT_SIZE(3);
+//         StaticJsonDocument<capacity> doc;
+
+//         Serial.println(msg->barcode);
+//         Serial.println(msg->msgType,DEC);
+//         doc["msg_type"] = msg->msgType;
+//         doc["barcode"] = msg->barcode;
+//         doc["qty"] = msg->qty;
+
+//         serializeJson(doc, output);
+//     }
+//     else if (msg->msgType == SENSORS)
+//     {
+
+//         const int capacity = JSON_OBJECT_SIZE(3);
+//         StaticJsonDocument<capacity> doc;
+//         doc["msg_type"] = msg->msgType;
+//         doc["humidity"] = msg->humidity;
+//         doc["temperature"] = msg->temperature;
+//         serializeJson(doc, output);
+//     }
+//     else if (msg->msgType == CONNECTED)
+//     {
+//         // target += sprintf(target, "{\"msg_type\": %d,}", msg->msgType);
+//         const int capacity = JSON_OBJECT_SIZE(1);
+//         StaticJsonDocument<capacity> doc;
+//         doc["msg_type"] = msg->msgType;
+//         serializeJson(doc, output);
+//     }
+//     else if (msg->msgType == REMOVE_MED)
+//     {
+//         const int capacity = JSON_OBJECT_SIZE(2);
+//         StaticJsonDocument<capacity> doc;
+//         doc["msg_type"].set(msg->msgType);
+//         doc["barcode"].set(msg->barcode);
+//         serializeJson(doc, output);
+//     }
+//     else if (msg->msgType == SCAN_MED)
+//     {
+//         const int capacity = JSON_OBJECT_SIZE(2);
+//         StaticJsonDocument<capacity> doc;
+//         doc["msg_type"].set(msg->msgType);
+//         doc["barcode"].set(msg->barcode.c_str());
+//         serializeJson(doc, output);
+//     }
+
+//     return output;
+//     // printf("%s", target);
+//     // fflush(stdout);
+// }
+
+static void structToJson(mqttStruct_t *msg, char* target)
 {
 
     String output;
 
     if (msg->msgType == DOOR)
     {
-        const int capacity = JSON_OBJECT_SIZE(2);
+        /* const int capacity = JSON_OBJECT_SIZE(2);
         StaticJsonDocument<capacity> doc;
         doc["msg_type"] = msg->msgType;
         doc["open"] = msg->open;
-        serializeJson(doc, output);
+        serializeJson(doc, output);*/
+
+        target += sprintf(target, "{\"msg_type\": %d,", msg->msgType);
+        target += sprintf(target, "\"open\": %s", booltochar[msg->open]);
+        target += sprintf(target, "}");
     }
     else if (msg->msgType == PUT_MED)
     {
-        const int capacity = JSON_OBJECT_SIZE(3);
+        /* const int capacity = JSON_OBJECT_SIZE(3);
         StaticJsonDocument<capacity> doc;
         doc["msg_type"] = msg->msgType;
-        doc["barcode"] = msg->barcode.c_str();
-        doc["exp_date"] = msg->expDate.c_str();
+        doc["barcode"] = msg->barcode;
+        doc["exp_date"] = msg->expDate;
 
-        serializeJson(doc, output);
+        serializeJson(doc, output);*/
+        target += sprintf(target, "{\"msg_type\": %d,", msg->msgType);
+        target += sprintf(target, "\"barcode\": \"%s\",", msg->barcode.c_str());
+        target += sprintf(target, "\"exp_date\": \"%s\"}", msg->expDate.c_str());
     }
     else if (msg->msgType == TAKE_MED)
     {
-        const int capacity = JSON_OBJECT_SIZE(3);
+        target += sprintf(target, "{\"msg_type\": %d,", msg->msgType);
+        target += sprintf(target, "\"barcode\": \"%s\",", msg->barcode.c_str());
+        target += sprintf(target, "\"qty\": %.2f}", msg->qty);
+
+        /* const int capacity = JSON_OBJECT_SIZE(3);
         StaticJsonDocument<capacity> doc;
         doc["msg_type"] = msg->msgType;
-        doc["barcode"] = msg->barcode.c_str();
+        doc["barcode"] = msg->barcode;
         doc["qty"] = msg->qty;
 
-        serializeJson(doc, output);
+        serializeJson(doc, output);*/
     }
     else if (msg->msgType == SENSORS)
     {
+        Log.verbose("Serialize Data" CR);
 
+        target += sprintf(target, "{\"msg_type\": %d,", msg->msgType);
+        target += sprintf(target, "\"humidity\": %0.2f,", msg->humidity);
+        target += sprintf(target, "\"temperature\": %0.2f}", msg->temperature);
+        /*
         //     Log.verbose("Serialize Sensors" CR);
         const int capacity = JSON_OBJECT_SIZE(3);
         StaticJsonDocument<capacity> doc;
@@ -136,109 +228,26 @@ static String structToJson(mqttStruct_t *msg)
         doc["humidity"] = msg->humidity;
         doc["temperature"] = msg->temperature;
         serializeJson(doc, output);
-        // Serial.println(output);
+        Serial.println(output);*/
     }
     else if (msg->msgType == CONNECTED)
     {
-        // target += sprintf(target, "{\"msg_type\": %d,}", msg->msgType);
-        const int capacity = JSON_OBJECT_SIZE(1);
-        StaticJsonDocument<capacity> doc;
-        doc["msg_type"] = msg->msgType;
-        serializeJson(doc, output);
+        target += sprintf(target, "{\"msg_type\": %d}", msg->msgType);
     }
     else if (msg->msgType == REMOVE_MED)
     {
-        const int capacity = JSON_OBJECT_SIZE(2);
-        StaticJsonDocument<capacity> doc;
-        // doc["msg_type"] = msg->msgType;
-        doc["msg_type"].set(msg->msgType);
-        doc["barcode"].set(msg->barcode.c_str());
-        //  Serial.println( msg->barcode);
-        serializeJson(doc, output);
+        target += sprintf(target, "{\"msg_type\": %d,", msg->msgType);
+        target += sprintf(target, "\"barcode\": \"%s\"}", msg->barcode.c_str());
     }
     else if (msg->msgType == SCAN_MED)
     {
-        const int capacity = JSON_OBJECT_SIZE(2);
-        StaticJsonDocument<capacity> doc;
-        doc["msg_type"].set(msg->msgType);
-        doc["barcode"].set(msg->barcode.c_str());
-        serializeJson(doc, output);
+        target += sprintf(target, "{\"msg_type\": %d,", msg->msgType);
+        target += sprintf(target, "\"barcode\": \"%s\"}", msg->barcode.c_str());
     }
-    return output;
-    // printf("%s", target);
-    // fflush(stdout);
+    // return output;
+    printf("%s", target);
+    fflush(stdout);
 }
-
-// static void structToJson(mqttStruct_t *msg, char *target)
-// {
-
-//     String output;
-
-//     if (msg->msgType == DOOR)
-//     {
-//         /* const int capacity = JSON_OBJECT_SIZE(2);
-//         StaticJsonDocument<capacity> doc;
-//         doc["msg_type"] = msg->msgType;
-//         doc["open"] = msg->open;
-//         serializeJson(doc, output);*/
-
-//         target += sprintf(target, "{\"msg_type\": %d,", msg->msgType);
-//         target += sprintf(target, "\"open\": %s", booltochar[msg->open]);
-//         target += sprintf(target, "}");
-//     }
-//     else if (msg->msgType == PUT_MED)
-//     {
-//         /* const int capacity = JSON_OBJECT_SIZE(3);
-//         StaticJsonDocument<capacity> doc;
-//         doc["msg_type"] = msg->msgType;
-//         doc["barcode"] = msg->barcode;
-//         doc["exp_date"] = msg->expDate;
-
-//         serializeJson(doc, output);*/
-//         target += sprintf(target, "{\"msg_type\": %d,", msg->msgType);
-//         target += sprintf(target, "\"barcode\": \"%s\",", msg->barcode);
-//         target += sprintf(target, "\"exp_date\": \"%s\"}", msg->expDate);
-//     }
-//     else if (msg->msgType == TAKE_MED)
-//     {
-//         target += sprintf(target, "{\"msg_type\": %d,", msg->msgType);
-//         target += sprintf(target, "\"barcode\": \"%s\",", msg->barcode);
-//         target += sprintf(target, "\"qty\": %d}", msg->qty);
-
-//         /* const int capacity = JSON_OBJECT_SIZE(3);
-//         StaticJsonDocument<capacity> doc;
-//         doc["msg_type"] = msg->msgType;
-//         doc["barcode"] = msg->barcode;
-//         doc["qty"] = msg->qty;
-
-//         serializeJson(doc, output);*/
-//     }
-//     else if (msg->msgType == SENSORS)
-//     {
-//         Log.verbose("Serialize Data" CR);
-
-//         target += sprintf(target, "{\"msg_type\": %d,", msg->msgType);
-//         target += sprintf(target, "\"humidity\": %0.2f,", msg->humidity);
-//         target += sprintf(target, "\"temperature\": %0.2f}", msg->temperature);
-//         /*
-//         //     Log.verbose("Serialize Sensors" CR);
-//         const int capacity = JSON_OBJECT_SIZE(3);
-//         StaticJsonDocument<capacity> doc;
-
-//         doc["msg_type"] = msg->msgType;
-//         doc["humidity"] = msg->humidity;
-//         doc["temperature"] = msg->temperature;
-//         serializeJson(doc, output);
-//         Serial.println(output);*/
-//     }
-//     else if (msg->msgType == CONNECTED)
-//     {
-//         target += sprintf(target, "{\"msg_type\": %d,}", msg->msgType);
-//     }
-//     // return output;
-//     printf("%s", target);
-//     fflush(stdout);
-// }
 
 void mqttTask(void *pvParameters)
 {
@@ -252,13 +261,15 @@ void mqttTask(void *pvParameters)
             if (xQueueReceive(mqttQ, (void *)&mqttReceive,
                               (portTickType)portMAX_DELAY))
             {
-                // String payload;
-                // structToJson(&mqttReceive, payload);
+              char payload[1024] = {0};
+                structToJson(&mqttReceive, payload);
 
-                String p = structToJson(&mqttReceive);
+                // String p = structToJson(&mqttReceive);
 
-                Log.verbose("send Serialized Data %S" CR, p.c_str());
-                client.publish(topicName + "/TX", p);
+                // Log.verbose("send Serialized Data %S" CR, p.c_str());
+                Log.verbose("send Serialized Data %S" CR, payload);
+                // client.publish(topicName + "/TX", p);
+                client.publish(topicName + "/TX",  payload);
                 // vTaskDelay(pdMS_TO_TICKS(100));
                 // client.publish("SmartCabinet/12345/TX", p);
 
@@ -276,7 +287,7 @@ void mqttTask(void *pvParameters)
 
 void createMqttTask()
 {
-    xTaskCreate(mqttTask, "mqttTask", 2048, NULL, 5, NULL);
+    xTaskCreate(mqttTask, "mqttTask", 4096, NULL, 5, NULL);
 }
 
 void onConnectionEstablished()
@@ -291,12 +302,13 @@ void onConnectionEstablished()
         deserializeJson(doc, payload);
 
         uint8_t msgType = doc["msg_type"];
+        // Serial.println (msgType,DEC);
         if (msgType == MED_DETAILS)
         {
             const char *barcode = doc["barcode"];
             const char *name = doc["name"];
             const char *type = doc["type"];
-            if (scannedMed == TAKE_MED_SCANNED)
+            if (scannedMed == TAKE_MED_SCANNED && cancelScan==false)
             {
                 lcdSendCommand("TakeMed.t_barcode.txt=\"" + (String)barcode + "\"");
                 //  vTaskDelay(pdMS_TO_TICKS(50));
@@ -321,7 +333,7 @@ void onConnectionEstablished()
                 //  vTaskDelay(pdMS_TO_TICKS(50));
                 lcdSendCommand("page TakeMed");
             }
-            else if (scannedMed == PUT_MED_SCANNED)
+            else if (scannedMed == PUT_MED_SCANNED && cancelScan==false)
             {
                 if ((String)name == "N/A")
                 {
@@ -333,6 +345,11 @@ void onConnectionEstablished()
                     lcdSendCommand("page ExpDate");
                 }
             }
+        }
+        else if (msgType == PHONE_CONNECTED)
+        {
+            // Serial.println("Here");
+            monitoringQueueAdd(MOBILE_CONNECTED_EVT);
         }
     });
 
