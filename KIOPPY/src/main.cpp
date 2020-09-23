@@ -27,7 +27,7 @@ QueueHandle_t monitoringQ;
 QueueHandle_t mqttQ;
 bool fanOn = false;
 bool blwrEnable = false;
-bool cancelScan=false;
+bool cancelScan = false;
 /*
 * Local Variables
 */
@@ -81,13 +81,13 @@ String meridiem;
 String currentTime;
 
 bool wifiReconnectReady = true;
-bool wifiMsgQueued=false;
+bool wifiMsgQueued = false;
 String wifiSSID;
 String wifiPassword;
 
 void monitoringQueueAdd(customEvents_t event)
 {
-  
+
   eventStruct_t ev = {.event = event};
   xQueueSendToBack(monitoringQ, &ev, portMAX_DELAY);
 }
@@ -136,7 +136,7 @@ void monitoringTask(void *pvParameters)
         lcdSendCommand("HomeScreen.t_temp.txt=\"" + String(getTemp()) + "\"");
         vTaskDelay(pdMS_TO_TICKS(150));
         lcdSendCommand("HomeScreen.t_hum.txt=\"" + String(getHum()) + "\"");
- vTaskDelay(pdMS_TO_TICKS(150));
+        vTaskDelay(pdMS_TO_TICKS(150));
         if (getTemp() >= TEMP_MAX_THRESHOLD)
         {
           // Log.verbose("MAX TEMP REACHED" CR);
@@ -176,12 +176,16 @@ void monitoringTask(void *pvParameters)
           Log.verbose("DOOR Open" CR);
           door.open = true;
           lcdSendCommand("Welcome.v_door.val=1");
+          vTaskDelay(pdMS_TO_TICKS(150));
+          lcdSendCommand("Welcome.v_door.val=1");
         }
         else
         {
           Log.verbose("DOOR close" CR);
           door.open = false;
           //lcdSendCommand("page page0");
+          lcdSendCommand("Welcome.v_door.val=0");
+          vTaskDelay(pdMS_TO_TICKS(150));
           lcdSendCommand("Welcome.v_door.val=0");
         }
 
@@ -200,48 +204,50 @@ void monitoringTask(void *pvParameters)
       {
         if (client.isConnected())
         {
-                   lcdSendCommand("HomeScreen.v_wifi.val=1");
+          lcdSendCommand("HomeScreen.v_wifi.val=1");
         }
         else
         {
           lcdSendCommand("HomeScreen.v_wifi.val=0");
           monitoringQueueAdd(WIFI_RECOONECT_EVT);
         }
-        
-        vTaskDelay(pdMS_TO_TICKS(150));
-           if(client.isWifiConnected()){
-          timeClient.forceUpdate();
-          }
-        epochTime = timeClient.getEpochTime();
-        if(epochTime>1599423864){
-        ptm = gmtime((time_t *)&epochTime);
-        monthDay = ptm->tm_mday;
-        currentMonthName = months[ptm->tm_mon];
-        currentYear = ptm->tm_year + 1900;
-        char day[2];
-        sprintf(day, "%02d", monthDay);
 
-        currentDate = String(currentMonthName) + " " + String(day) + ", " + String(currentYear);
-        lcdSendCommand("HomeScreen.t_date.txt=\"" + currentDate + "\"");
         vTaskDelay(pdMS_TO_TICKS(150));
-        currentHour = timeClient.getHours();
-        if (currentHour < 12)
+        if (client.isWifiConnected())
         {
-          meridiem = "am";
+          timeClient.forceUpdate();
         }
-        else
+        epochTime = timeClient.getEpochTime();
+        if (epochTime > 1599423864)
         {
-          meridiem = "pm";
-          if (currentHour > 12)
+          ptm = gmtime((time_t *)&epochTime);
+          monthDay = ptm->tm_mday;
+          currentMonthName = months[ptm->tm_mon];
+          currentYear = ptm->tm_year + 1900;
+          char day[2];
+          sprintf(day, "%02d", monthDay);
+
+          currentDate = String(currentMonthName) + " " + String(day) + ", " + String(currentYear);
+          lcdSendCommand("HomeScreen.t_date.txt=\"" + currentDate + "\"");
+          vTaskDelay(pdMS_TO_TICKS(150));
+          currentHour = timeClient.getHours();
+          if (currentHour < 12)
           {
-            currentHour = currentHour - 12;
+            meridiem = "am";
           }
-        }
-        currentMinute = timeClient.getMinutes();
-        char min[2];
-        sprintf(min, "%02d", currentMinute);
-        currentTime = (String)currentHour + ":" + (String)min + " " + meridiem;
-        lcdSendCommand("HomeScreen.t_time.txt=\"" + currentTime + "\"");
+          else
+          {
+            meridiem = "pm";
+            if (currentHour > 12)
+            {
+              currentHour = currentHour - 12;
+            }
+          }
+          currentMinute = timeClient.getMinutes();
+          char min[2];
+          sprintf(min, "%02d", currentMinute);
+          currentTime = (String)currentHour + ":" + (String)min + " " + meridiem;
+          lcdSendCommand("HomeScreen.t_time.txt=\"" + currentTime + "\"");
         }
         xTimerStart(ntpTimer, 0);
         // monitoringQueueAdd(WIFI_RECOONECT_EVT);
@@ -252,23 +258,23 @@ void monitoringTask(void *pvParameters)
         if (wifiReconnectReady && !client.isConnected())
         {
           Log.verbose("Trying to reconnect" CR);
-          wifiReconnectReady=false;
+          wifiReconnectReady = false;
           xTimerStart(wifiReconnectTimer, 0);
           WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
         }
         break;
-        
-        case MOBILE_DISCONNECTED_EVT:
-          xTimerStart(mobileConnectedTimer,0);
-          lcdSendCommand("HomeScreen.v_mobile.val=0");
-            vTaskDelay(pdMS_TO_TICKS(150));
+
+      case MOBILE_DISCONNECTED_EVT:
+        xTimerStart(mobileConnectedTimer, 0);
+        lcdSendCommand("HomeScreen.v_mobile.val=0");
+        vTaskDelay(pdMS_TO_TICKS(150));
         break;
 
-        case MOBILE_CONNECTED_EVT:
-          xTimerStart(mobileConnectedTimer,0);
-         lcdSendCommand("HomeScreen.v_mobile.val=1");
-           vTaskDelay(pdMS_TO_TICKS(150));
-         break;
+      case MOBILE_CONNECTED_EVT:
+        xTimerStart(mobileConnectedTimer, 0);
+        lcdSendCommand("HomeScreen.v_mobile.val=1");
+        vTaskDelay(pdMS_TO_TICKS(150));
+        break;
       default:
         break;
       }
@@ -283,7 +289,6 @@ void IRAM_ATTR dhtTimerCallBack(TimerHandle_t dhtTimer)
   monitoringQueueAddFromISR(DHT_TIMER_EVT);
 }
 
-
 void IRAM_ATTR mobileTimerCallback(TimerHandle_t mobileConnectedTimer)
 {
 
@@ -292,8 +297,8 @@ void IRAM_ATTR mobileTimerCallback(TimerHandle_t mobileConnectedTimer)
 
 void IRAM_ATTR wifiReconnectTimerCallback(TimerHandle_t wifiReconnectTimer)
 {
-  wifiReconnectReady=true;
-  wifiMsgQueued=false;
+  wifiReconnectReady = true;
+  wifiMsgQueued = false;
 }
 
 void IRAM_ATTR ntpTimerCallback(TimerHandle_t ntpTimer)
@@ -327,7 +332,7 @@ void setup()
 
   wifiSSID = readStringFromEEPROM(SSID_ADDRESS);
   wifiPassword = readStringFromEEPROM(PASSWORD_ADDRESS);
-  EEPROM.write(6,0x00);
+  EEPROM.write(6, 0x00);
   EEPROM.commit();
   // Serial.println(wifiPassword);
   if (wifiSSID == "")
@@ -345,9 +350,7 @@ void setup()
   dhtTimer = xTimerCreate("dhtTimer", dhtTimeOut / portTICK_PERIOD_MS, pdFALSE, (void *)0, dhtTimerCallBack);
   ntpTimer = xTimerCreate("NTP timer", ntpTimeout / portTICK_PERIOD_MS, pdFALSE, (void *)0, ntpTimerCallback);
   wifiReconnectTimer = xTimerCreate("WiFi Timer", wifiTimeout / portTICK_PERIOD_MS, pdFALSE, (void *)0, wifiReconnectTimerCallback);
-  mobileConnectedTimer=xTimerCreate("Mobile Timer",mobileTimeout/ portTICK_PERIOD_MS, pdFALSE, (void *)0, mobileTimerCallback);
-
-
+  mobileConnectedTimer = xTimerCreate("Mobile Timer", mobileTimeout / portTICK_PERIOD_MS, pdFALSE, (void *)0, mobileTimerCallback);
 
   client.enableDebuggingMessages();
   Log.verbose("Setup Done!" CR);
@@ -381,7 +384,8 @@ void loop()
   }
 
   if (!client.isConnected() && wifiReconnectReady && !wifiMsgQueued)
-  {     wifiMsgQueued=true;
-        monitoringQueueAdd(WIFI_RECOONECT_EVT);
+  {
+    wifiMsgQueued = true;
+    monitoringQueueAdd(WIFI_RECOONECT_EVT);
   }
 }

@@ -212,6 +212,15 @@ static void structToJson(mqttStruct_t *msg, char* target)
 
         serializeJson(doc, output);*/
     }
+    else if (msg->msgType==NEW_MED)
+    {
+        target += sprintf(target, "{\"msg_type\": %d,", msg->msgType);
+        target += sprintf(target, "\"barcode\": \"%s\",", msg->barcode.c_str());
+ target += sprintf(target, "\"name\": \"%s\",", msg->name.c_str());
+ target += sprintf(target, "\"type\": \"%s\",", msg->form.c_str());
+
+          target += sprintf(target, "\"exp_date\": \"%s\"}", msg->expDate.c_str());
+    }
     else if (msg->msgType == SENSORS)
     {
         Log.verbose("Serialize Data" CR);

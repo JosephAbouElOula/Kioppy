@@ -9,6 +9,8 @@ typedef struct
     bool open;
     String barcode;
     String expDate;
+    String name;
+    String form;
     // char barcode[49];
 	// char expDate[11];
     float qty;
@@ -28,6 +30,7 @@ typedef enum
     SCAN_MED,
     MED_DETAILS,
     PHONE_CONNECTED,
+    NEW_MED,
 } mqttMsgType_t;
 
 extern QueueHandle_t mqttQ;

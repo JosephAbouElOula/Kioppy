@@ -16,7 +16,6 @@
 #define LCD_RECEIVE_TASK_PRIORITY 1
 #define LCD_TRANSMIT_TASK_PRIORITY 2
 
-
 QueueHandle_t lcdUartRxQueue;
 QueueHandle_t lcdUartTxQueue;
 
@@ -130,7 +129,7 @@ static void lcd_uart_Queue_task(void *pvParameters)
 			else if (strData.charAt(0) == 'R')
 			{
 				//Remove medicine from the cabinet
-				Barcode = strData.substring(1,strData.length()-1);
+				Barcode = strData.substring(1, strData.length() - 1);
 				mqttStruct_t removeMedicine;
 				removeMedicine.msgType = REMOVE_MED;
 				removeMedicine.barcode = Barcode;
@@ -165,7 +164,7 @@ static void lcd_uart_Queue_task(void *pvParameters)
 			}
 			else if (strData.charAt(0) == 'S')
 			{
-				cancelScan=false;
+				cancelScan = false;
 				//Medicine Scanned, waiting for name from Mqtt
 
 				if (strData.charAt(1) == 'A')
@@ -178,7 +177,7 @@ static void lcd_uart_Queue_task(void *pvParameters)
 					//Take Med
 					scannedMed = TAKE_MED_SCANNED;
 				}
-				Barcode = strData.substring(2,strData.length()-1);
+				Barcode = strData.substring(2, strData.length() - 1);
 
 				mqttStruct_t getMedName;
 				getMedName.msgType = SCAN_MED;
@@ -203,28 +202,51 @@ static void lcd_uart_Queue_task(void *pvParameters)
 			else if (strData.charAt(0) == 'F')
 			{
 				//Factory Reset
-				EEPROM.write(BLOWER_ADDRESS,1);
+				EEPROM.write(BLOWER_ADDRESS, 1);
 				EEPROM.write(SETUP_ADDRESS, 1);
 				EEPROM.commit();
 				ESP.restart();
 			}
-			else if (strData.charAt(0)=='B'){
+			else if (strData.charAt(0) == 'B')
+			{
 				//Blower
-				if (strData.charAt(1)=='E'){
-					EEPROM.write(BLOWER_ADDRESS,1);
+				if (strData.charAt(1) == 'E')
+				{
+					EEPROM.write(BLOWER_ADDRESS, 1);
 					EEPROM.commit();
-					blwrEnable=1;
-				} else {
-					
-					EEPROM.write(BLOWER_ADDRESS,0);
+					blwrEnable = 1;
+				}
+				else
+				{
+
+					EEPROM.write(BLOWER_ADDRESS, 0);
 					EEPROM.commit();
-					blwrEnable=0;
+					blwrEnable = 0;
 					turnFanOff();
 				}
-				
-			}else if(strData.charAt(0)=='C'){
+			}
+			else if (strData.charAt(0) == 'C')
+			{
 				//Cancel Scan
-				cancelScan=true;
+				cancelScan = true;
+			}
+			else if (strData.charAt(0) == 'X')
+			{
+				//New Medicine
+				mqttStruct_t notFoundMed;
+				notFoundMed.msgType = NEW_MED;
+				notFoundMed.barcode = Barcode;
+				if (strData.charAt(1) == '1')
+				{
+					notFoundMed.form = "pills";
+				}
+				else
+				{
+					notFoundMed.form = "syrup";
+				}
+				notFoundMed.expDate = strData.substring(2, 10);
+				notFoundMed.name = strData.substring(10);
+				xQueueSendToBack(mqttQ, &notFoundMed, portMAX_DELAY);
 			}
 		}
 	}
@@ -415,8 +437,8 @@ void nextionUartInit(void)
 
 	lcdSendCommand("needs_setup.val=" + String(needs_setup));
 	vTaskDelay(pdMS_TO_TICKS(350));
-		lcdSendCommand("needs_setup.val=" + String(needs_setup));
-		vTaskDelay(pdMS_TO_TICKS(150));
+	lcdSendCommand("needs_setup.val=" + String(needs_setup));
+	vTaskDelay(pdMS_TO_TICKS(150));
 	if (!needs_setup)
 	{
 		//read the stored code in the EEPROM
