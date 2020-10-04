@@ -69,7 +69,7 @@ void lcdSendCommand(String str)
 {
 	Log.verbose("Message to Send %s" CR, str.c_str()); // + String ((char) 0xFF + (char) 0xFF + (char) 0xFF ));
 	// LCD_SERIAL.print(str);
-	xQueueSendToBack(lcdUartTxQueue, &str, portMAX_DELAY);
+	xQueueSendToBack(lcdUartTxQueue, &str, pdMS_TO_TICKS(500));
 }
 
 static void lcd_uart_tx_task(void *pvParameters)
@@ -80,7 +80,7 @@ static void lcd_uart_tx_task(void *pvParameters)
 	{
 		if (xQueueReceive(lcdUartTxQueue, (void *)&strCommand, (portTickType)portMAX_DELAY))
 		{
-			Log.verbose("Message to Send From Queue %s" CR, strCommand.c_str()); // + String ((char) 0xFF + (char) 0xFF + (char) 0xFF ));
+			// Log.verbose("Message to Send From Queue %s" CR, strCommand.c_str()); // + String ((char) 0xFF + (char) 0xFF + (char) 0xFF ));
 			LCD_SERIAL.print(strCommand);
 			LCD_SERIAL.write(0xFF);
 			LCD_SERIAL.write(0xFF);
@@ -134,7 +134,7 @@ static void lcd_uart_Queue_task(void *pvParameters)
 				removeMedicine.msgType = REMOVE_MED;
 				removeMedicine.barcode = Barcode;
 				Log.verbose("Barcode %s" CR, removeMedicine.barcode.c_str());
-				xQueueSendToBack(mqttQ, &removeMedicine, portMAX_DELAY);
+				xQueueSendToBack(mqttQ, &removeMedicine, pdMS_TO_TICKS(500));
 				//TODO: do we need a new screen after removing?
 			}
 			else if (strData.charAt(0) == 'A')
@@ -146,7 +146,7 @@ static void lcd_uart_Queue_task(void *pvParameters)
 				addMed.msgType = PUT_MED;
 				addMed.barcode = Barcode;
 				addMed.expDate = expDate;
-				xQueueSendToBack(mqttQ, &addMed, portMAX_DELAY);
+				xQueueSendToBack(mqttQ, &addMed, pdMS_TO_TICKS(500));
 			}
 			else if (strData.charAt(0) == 'T')
 			{
@@ -160,7 +160,7 @@ static void lcd_uart_Queue_task(void *pvParameters)
 				takeMed.barcode = Barcode;
 				takeMed.qty = tmp;
 
-				xQueueSendToBack(mqttQ, &takeMed, portMAX_DELAY);
+				xQueueSendToBack(mqttQ, &takeMed, pdMS_TO_TICKS(500));
 			}
 			else if (strData.charAt(0) == 'S')
 			{
@@ -182,7 +182,7 @@ static void lcd_uart_Queue_task(void *pvParameters)
 				mqttStruct_t getMedName;
 				getMedName.msgType = SCAN_MED;
 				getMedName.barcode = Barcode;
-				xQueueSendToBack(mqttQ, &getMedName, portMAX_DELAY);
+				xQueueSendToBack(mqttQ, &getMedName, pdMS_TO_TICKS(500));
 			}
 
 			else if (strData.charAt(0) == 'W')
@@ -246,7 +246,7 @@ static void lcd_uart_Queue_task(void *pvParameters)
 				}
 				notFoundMed.expDate = strData.substring(2, 10);
 				notFoundMed.name = strData.substring(10);
-				xQueueSendToBack(mqttQ, &notFoundMed, portMAX_DELAY);
+				xQueueSendToBack(mqttQ, &notFoundMed, pdMS_TO_TICKS(500));
 			}
 		}
 	}
@@ -407,7 +407,7 @@ static void readLCDSerial(void *pvParameters)
 		if (LCD_SERIAL.available())
 		{
 			tmpSerial = LCD_SERIAL.readString();
-			xQueueSendToBack(lcdUartRxQueue, &tmpSerial, portMAX_DELAY);
+			xQueueSendToBack(lcdUartRxQueue, &tmpSerial, pdMS_TO_TICKS(500));
 		}
 		vTaskDelay(pdMS_TO_TICKS(10));
 	}

@@ -89,7 +89,7 @@ void monitoringQueueAdd(customEvents_t event)
 {
 
   eventStruct_t ev = {.event = event};
-  xQueueSendToBack(monitoringQ, &ev, portMAX_DELAY);
+  xQueueSendToBack(monitoringQ, &ev, pdMS_TO_TICKS(500));
 }
 void monitoringQueueAddFromISR(customEvents_t event)
 {
@@ -157,7 +157,7 @@ void monitoringTask(void *pvParameters)
           params.msgType = SENSORS;                      //msgType
           params.humidity = getDhtData().humidity;       //Hum
           params.temperature = getDhtData().temperature; //Temp
-          xQueueSendToBack(mqttQ, &params, portMAX_DELAY);
+          xQueueSendToBack(mqttQ, &params, pdMS_TO_TICKS(500));
           // sendDHTtoMqtt = false;
         }
 
@@ -191,11 +191,11 @@ void monitoringTask(void *pvParameters)
 
         if (millis() - timeSent > 1000)
         {
-          xQueueSendToBack(mqttQ, &door, portMAX_DELAY);
+          xQueueSendToBack(mqttQ, &door, pdMS_TO_TICKS(500));
           timeSent = millis();
         }
         // openDoor();
-
+      Log.verbose("Attach Interrupt" CR);
         doorIntEn();
         break;
       }
@@ -360,7 +360,7 @@ void setup()
   // WiFi.begin("hs1", "1122334400");
   topicName = "Kioppy/" + WiFi.macAddress();
 
-  xTaskCreate(monitoringTask, "MonitoringTask", configMINIMAL_STACK_SIZE * 3, NULL, 5, NULL);
+  xTaskCreate(monitoringTask, "MonitoringTask", configMINIMAL_STACK_SIZE * 6, NULL, 5, NULL);
   createMqttTask();
 
   xTimerStart(dhtTimer, 0);

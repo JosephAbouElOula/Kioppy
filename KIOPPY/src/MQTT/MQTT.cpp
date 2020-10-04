@@ -9,7 +9,7 @@
 //String payload;
 void mqttSendMessage(mqttStruct_t msg)
 {
-    xQueueSendToBack(mqttQ, &msg, portMAX_DELAY);
+    xQueueSendToBack(mqttQ, &msg, pdMS_TO_TICKS(500));
 }
 
 // void mqttSendMessage(mqttMsgType_t msgType)
@@ -364,7 +364,7 @@ void onConnectionEstablished()
 
     mqttStruct_t con;
     con.msgType = CONNECTED; //msgType
-    xQueueSendToBack(mqttQ, &con, portMAX_DELAY);
+    xQueueSendToBack(mqttQ, &con, pdMS_TO_TICKS(500));
 
     // client.publish(topicName, "Success", true);
 }
