@@ -5,6 +5,17 @@
 #include "nvs_flash.h"
 nvs_handle confNvsHandle;
 
+void nvsInitializeConf(nvsConfig_t *conf)
+{
+        strcpy(conf->blwr.key, "blwr");
+        strcpy(conf->lockCode.key, "code");
+        strcpy(conf->medCnt.key, "medCnt");
+        strcpy(conf->needs_setup.key, "needsSetup");
+        strcpy(conf->wifiPassword.key, "SSID");
+        strcpy(conf->wifiSSID.key, "PWD");
+
+        nvsInitializeConf(&nvsConf);
+}
 void nvsInit()
 {
         ESP_LOGD(NVS_TAG, "nvsInit");
@@ -19,6 +30,41 @@ void nvsInit()
                 err = nvs_flash_init();
         }
         ESP_ERROR_CHECK(err);
+}
+
+uint8_t nvsReadOrSetU8(char *key, uint8_t default_value)
+{
+        uint8_t temp;
+        esp_err_t err = nvsReadU8(key, &temp);
+        if (err == ESP_ERR_NVS_NOT_FOUND)
+        {
+                nvsSaveU8(key, default_value);
+                return default_value;
+        }
+        return temp;
+}
+
+void nvsReadOrSetStr(char *key, char *value, size_t val_len, char *default_value)
+{
+        esp_err_t err = nvsReadStr(key, value, val_len);
+        if (err == ESP_ERR_NVS_NOT_FOUND)
+        {
+                nvsSaveStr(key, default_value);
+                strncpy(value, default_value, val_len);
+        }
+}
+
+void nvsGetConf(nvsConfig_t *conf)
+{
+
+        ESP_LOGD(NVS_TAG, "nvsGetConf");
+        /* Read WiFi configuration */
+        nvsReadOrSetStr(conf->wifiSSID.key, conf->wifiSSID.value, 32, (char *)"hs1");
+        nvsReadOrSetStr(conf->wifiPassword.key, conf->wifiPassword.value, 64, (char *)"123456");
+        /* Read coffee making stage */
+        conf->needs_setup.value = nvsReadOrSetU8(conf->needs_setup.key, 1);
+        conf->blwr.value = nvsReadOrSetU8(conf->blwr.key, 1);
+        conf->medCnt.value = nvsReadOrSetU8(conf->medCnt.key, 0);
 }
 
 esp_err_t nvsReadStr(char *key, char *value, size_t val_len)
@@ -78,7 +124,7 @@ esp_err_t nvsReadU16(char *key, uint16_t *value)
         return err;
 }
 
-void nvsSaveStr(char *key, char *value)
+void nvsSaveStr(char *key, const char *value)
 {
         esp_err_t err = nvs_open("conf_storage", NVS_READWRITE, &confNvsHandle);
         if (err != ESP_OK)

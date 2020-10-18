@@ -7,7 +7,7 @@
 #include "Global.h"
 #include "Nextion/Nextion.h"
 #include "Barcode/Barcode.h"
-#include "EEPROM.h"
+#include "NVS/KIOPPY_NVS.h"
 
 /*
 * defines
@@ -15,7 +15,6 @@
 #define FAN_PIN 27
 #define LOCK_PIN 32
 #define DOOR_DET_PIN 26
-
 
 const int doorTimeOut = 3000;
 /*
@@ -49,7 +48,6 @@ void IRAM_ATTR doorDetInt()
 {
     detachInterrupt(DOOR_DET_PIN);
     monitoringQueueAddFromISR(DOOR_EVT);
- 
 
     // monitoringQueueAdd(DOOR_EVT);
 }
@@ -91,14 +89,15 @@ void hardwareInit()
     doorTimer = xTimerCreate("doorTimer", doorTimeOut / portTICK_PERIOD_MS, pdFALSE, (void *)0, doorTimerCallBack);
     nextionUartInit();
     barcodeUartInit();
-    
-    if(EEPROM.read(BLOWER_ADDRESS)==0){
-        blwrEnable=0;
-    } else {
-        blwrEnable=1;
+
+    if (nvsConf.blwr.value == 0)
+    {
+        blwrEnable = 0;
+    }
+    else
+    {
+        blwrEnable = 1;
     }
 
-
     initDHT(10);
-    
 }

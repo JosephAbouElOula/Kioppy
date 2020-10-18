@@ -5,7 +5,7 @@
 #include "MQTT/MQTT.h"
 #include "Hardware/Hardware.h"
 #include "Nextion.h"
-#include "Eeprom/eeprom.h"
+#include "NVS/KIOPPY_NVS.h"
 
 // #define LCD_SERIAL UART_NUM_1
 #define LCD_SERIAL Serial1
@@ -27,7 +27,8 @@ ScannedMed scannedMed = NO_MED_SCANNED;
 
 void setLockCode(String code)
 {
-	writeStringToEEPROM(LOCK_CODE_ADDRESS, code);
+	nvsSaveStr(nvsConf.lockCode.key, code.c_str());
+
 	lockCode = code;
 }
 
@@ -114,11 +115,9 @@ static void lcd_uart_Queue_task(void *pvParameters)
 
 				newCode = strData.substring(1);
 				setLockCode(newCode);
-				EEPROM.write(SETUP_ADDRESS, 0);
-				EEPROM.commit();
+				nvsSaveU8(nvsConf.needs_setup.key, 0);
+
 				Log.verbose("New Code set to %s" CR, newCode.c_str());
-				uint8_t needs_setup = EEPROM.read(SETUP_ADDRESS);
-				Log.verbose("Needs Setup %d" CR, needs_setup);
 			}
 			else if (strData.charAt(0) == 'U')
 			{
@@ -194,17 +193,18 @@ static void lcd_uart_Queue_task(void *pvParameters)
 			{
 				//Wifi Password
 				wifiPassword = strData.substring(1);
-				writeStringToEEPROM(SSID_ADDRESS, wifiSSID);
-				writeStringToEEPROM(PASSWORD_ADDRESS, wifiPassword);
+
+				nvsSaveStr(nvsConf.wifiSSID.key, wifiSSID.c_str());
+				nvsSaveStr(nvsConf.wifiPassword.key, wifiPassword.c_str());
+
 				monitoringQueueAdd(WIFI_RECOONECT_EVT);
 				// WiFi.begin(SSID.c_str(), PWD.c_str());
 			}
 			else if (strData.charAt(0) == 'F')
 			{
 				//Factory Reset
-				EEPROM.write(BLOWER_ADDRESS, 1);
-				EEPROM.write(SETUP_ADDRESS, 1);
-				EEPROM.commit();
+				nvsSaveU8(nvsConf.blwr.key,1);
+				nvsSaveU8(nvsConf.needs_setup.key,1);
 				ESP.restart();
 			}
 			else if (strData.charAt(0) == 'B')
@@ -212,15 +212,12 @@ static void lcd_uart_Queue_task(void *pvParameters)
 				//Blower
 				if (strData.charAt(1) == 'E')
 				{
-					EEPROM.write(BLOWER_ADDRESS, 1);
-					EEPROM.commit();
+					nvsSaveU8(nvsConf.blwr.key,1);
 					blwrEnable = 1;
 				}
 				else
 				{
-
-					EEPROM.write(BLOWER_ADDRESS, 0);
-					EEPROM.commit();
+					nvsSaveU8(nvsConf.blwr.key,0);
 					blwrEnable = 0;
 					turnFanOff();
 				}
@@ -423,8 +420,8 @@ void nextionUartInit(void)
 	xTaskCreate(readLCDSerial, "LCD_UART_RX", configMINIMAL_STACK_SIZE * 3, NULL, 5, NULL);
 	xTaskCreate(lcd_uart_Queue_task, "lcd_uart_Queue_task", 2048, NULL, LCD_TRANSMIT_TASK_PRIORITY, &lcdUartRxHandle);
 	xTaskCreate(lcd_uart_tx_task, "lcd_uart_tx_task", 2048, NULL, LCD_TRANSMIT_TASK_PRIORITY, &lcdUartTxHandle);
-	EEPROM.begin(512);
-	uint8_t needs_setup = EEPROM.read(SETUP_ADDRESS);
+
+	uint8_t needs_setup =nvsConf.needs_setup.value;
 	lcdSendCommand("rest");
 	vTaskDelay(pdMS_TO_TICKS(150));
 	Log.verbose("Needs Setup %d" CR, needs_setup);
@@ -442,7 +439,7 @@ void nextionUartInit(void)
 	if (!needs_setup)
 	{
 		//read the stored code in the EEPROM
-		lockCode = readStringFromEEPROM(LOCK_CODE_ADDRESS);
+		lockCode=nvsConf.lockCode.value;
 		if (lockCode == "")
 		{
 			setLockCode("1234");

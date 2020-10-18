@@ -3,7 +3,8 @@
 #include "ArduinoLog.h"
 #include "NVS\KIOPPY_NVS.h"
 
-#define medCntKey "medCntKey"
+nvsConfig_t nvsConf;
+
 uint8_t Medicines::counter = 0;
 Medicine::Medicine(uint8_t ID)
 {
@@ -135,7 +136,7 @@ uint8_t Medicines::createNewMedicine(MedicineParams_t *medParam)
 
     Medicine M(medParam, counter, 1);
     medicinesMap.insert({M.getBarcode(), M});
-    nvsSaveU8(medCntKey, counter);
+    nvsSaveU8(nvsConf.medCnt.key , counter);
     return this->counter;
 }
 
@@ -156,7 +157,7 @@ uint8_t Medicines::loadMedicines()
 {
     uint8_t savedMedCount = 0;
     this->counter = 0;
-    nvsReadU8(medCntKey, &savedMedCount);
+    nvsReadU8(nvsConf.medCnt.key, &savedMedCount);
 
     for (int i = 0; i < savedMedCount; i++)
     {
@@ -181,7 +182,7 @@ void Medicines::deleteMedicine(char *barcode)
         }
     }
     this->counter--;
-    nvsSaveU8(medCntKey, counter);
+    nvsSaveU8(nvsConf.medCnt.key, counter);
 }
 
 void Medicines::deleteAllMedicines()
@@ -192,5 +193,5 @@ void Medicines::deleteAllMedicines()
         element.second.~Medicine();
     }
     medicinesMap.clear();
-    nvsSaveU8(medCntKey, 0);
+    nvsSaveU8(nvsConf.medCnt.key, 0);
 }

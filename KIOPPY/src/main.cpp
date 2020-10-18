@@ -9,12 +9,11 @@
 #include "DHT\myDht.h"
 #include "Global.h"
 #include "MQTT\MQTT.h"
-#include "Eeprom\eeprom.h"
 #include "Nextion\Nextion.h"
 #include <NTPClient.h>
 #include <Preferences.h> // WiFi storage
 #include "WiFi/WiFi.h"
-
+#include "NVS\KIOPPY_NVS.h"
 #include "time.h"
 /*
  * Defines
@@ -82,8 +81,6 @@ String currentTime;
 
 bool wifiReconnectReady = true;
 bool wifiMsgQueued = false;
-String wifiSSID;
-String wifiPassword;
 
 void monitoringQueueAdd(customEvents_t event)
 {
@@ -324,16 +321,17 @@ void setup()
 
   Log.begin(LOG_LEVEL_VERBOSE, &Serial);
   Log.setPrefix(printTimestamp);
-  EEPROM.begin(512);
+
+  nvsInit();
+  nvsGetConf(&nvsConf);
 
   hardwareInit();
   // writeStringToEEPROM(6,"hs1");
   // writeStringToEEPROM(40,"1122334400");
 
-  wifiSSID = readStringFromEEPROM(SSID_ADDRESS);
-  wifiPassword = readStringFromEEPROM(PASSWORD_ADDRESS);
-  EEPROM.write(6, 0x00);
-  EEPROM.commit();
+  wifiSSID = nvsConf.wifiSSID.value;
+  wifiPassword =  nvsConf.wifiPassword.value;
+
   // Serial.println(wifiPassword);
   if (wifiSSID == "")
   {

@@ -9,6 +9,7 @@
 #define SSID_ADDRESS 10
 #define PASSWORD_ADDRESS 50
 
+
 extern bool blwrEnable; 
 extern bool cancelScan;
 typedef enum
