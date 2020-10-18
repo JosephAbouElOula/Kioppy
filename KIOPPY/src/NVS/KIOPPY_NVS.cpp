@@ -4,6 +4,7 @@
 #include "nvs.h"
 #include "nvs_flash.h"
 nvs_handle confNvsHandle;
+
 void nvsInit()
 {
         ESP_LOGD(NVS_TAG, "nvsInit");

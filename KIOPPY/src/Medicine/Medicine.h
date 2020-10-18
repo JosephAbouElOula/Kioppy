@@ -25,10 +25,12 @@ public:
     uint16_t getQty();
     void changeID(uint8_t newID);
     void getParameters(MedicineParams_t* mp);
+    uint8_t getId();
 
 private:
     uint8_t ID;
     void updateKeys();
+    void updateNvsValues();
     char nvsBarcodeKey[6];
     char nvsDescKey[6];
     char nvsTypeKey[6];
@@ -52,5 +54,6 @@ class Medicines{
         void deleteMedicine(char* barcode);
 private: 
 	std::unordered_map<char*, Medicine> medicinesMap;
+	std::unordered_map<uint8_t, Medicine> medicinesIDMap;
 	static uint8_t counter;
 };

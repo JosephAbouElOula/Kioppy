@@ -3,8 +3,8 @@
 #include "ArduinoLog.h"
 #include "NVS\KIOPPY_NVS.h"
 
-#define profCntKey "profCnt"
-
+#define medCntKey "medCntKey"
+uint8_t Medicines::counter = 0;
 Medicine::Medicine(uint8_t ID)
 {
     this->ID = ID;
@@ -37,6 +37,18 @@ void Medicine::changeID(uint8_t newID)
 {
     this->ID = ID;
     updateKeys();
+    updateNvsValues();
+}
+void Medicine::updateNvsValues()
+{
+    nvsSaveStr(nvsBarcodeKey, this->barcode);
+    nvsSaveStr(nvsDescKey, this->description);
+    nvsSaveU8(nvsTypeKey, this->type);
+    nvsSaveU16(nvsQtyKey, this->qty);
+}
+uint8_t Medicine::getId()
+{
+    return this->ID;
 }
 
 void Medicine::updateKeys()
@@ -78,7 +90,7 @@ void Medicine::setQty(uint16_t qty, bool saveToNvs)
     this->qty = qty;
     if (saveToNvs)
     {
-        nvsSaveU8(nvsQtyKey, this->qty);
+        nvsSaveU16(nvsQtyKey, this->qty);
     }
 }
 
@@ -117,63 +129,68 @@ void Medicines::createNewMedicine(char *barcode)
     medicinesMap.insert({M.getBarcode(), M});
 }
 
-uint8_t Medicines::createNewMedicine(MedicineParams_t *medParam) {
-	this->counter++;
+uint8_t Medicines::createNewMedicine(MedicineParams_t *medParam)
+{
+    this->counter++;
 
-	Medicine M(medParam, counter, 1);
-	medicinesMap.insert( {M.getBarcode(), M });
-	nvsSaveU8(profCntKey, counter);
-	return this->counter;
+    Medicine M(medParam, counter, 1);
+    medicinesMap.insert({M.getBarcode(), M});
+    nvsSaveU8(medCntKey, counter);
+    return this->counter;
 }
 
-void Medicines::loadNewMedicine() {
+void Medicines::loadNewMedicine()
+{
 
-	this->counter++;
-//	Profile P(profileParams->name, this->counter);
-	Medicine M(this->counter);
-	medicinesMap.insert( {M.getBarcode(), M });
+    this->counter++;
+    Medicine M(this->counter);
+    medicinesMap.insert({M.getBarcode(), M});
 }
 
-Medicine Medicines::getMedicineByBarcode(char* barcode) {
-	return (medicinesMap.find(barcode)->second);
+Medicine Medicines::getMedicineByBarcode(char *barcode)
+{
+    return (medicinesMap.find(barcode)->second);
 }
 
-uint8_t Medicines::loadMedicines() {
-	uint8_t savedMedCount = 0;
-	this->counter = 0;
-	nvsReadU8(profCntKey, &savedMedCount);
-	/*
-	 ProfileParams_t* profParams = new ProfileParams_t;
-	 char nvsProfileKey[10];*/
+uint8_t Medicines::loadMedicines()
+{
+    uint8_t savedMedCount = 0;
+    this->counter = 0;
+    nvsReadU8(medCntKey, &savedMedCount);
 
-	for (int i = 0; i < savedMedCount; i++) {
-		loadNewMedicine();
-	}
+    for (int i = 0; i < savedMedCount; i++)
+    {
+        loadNewMedicine();
+    }
 
-	return savedMedCount;
-
+    return savedMedCount;
 }
 
-void Medicines::deleteMedicine(char* barcode) {
-	getMedicineByBarcode(ID).~Medicines();
-//	profilesMap.erase(ID);
-	for (uint8_t i = ID + 1; i <= this->counter; i++) {
-		getProfileById(ID).changeID(i - 1);
-		profilesMap.erase(i-1);
-		profilesMap.insert( { i-1, getProfileById(i) });
-//		profilesMap.insert({i-1,getProfileById(ID)};
-		//profilesMap.insert( { i, P });
-	}
-	profilesMap.erase(this->counter);
-	this->counter--;
-	nvsSaveU8(nvsConf.profileCounter.key, counter);
+void Medicines::deleteMedicine(char *barcode)
+{
+    getMedicineByBarcode(barcode).~Medicine();
+    medicinesMap.erase(barcode);
+    uint8_t i = 0;
+
+    for (std::pair<char *, Medicine> element : medicinesMap)
+    {
+        i++;
+        if (element.second.getId() > i)
+        {
+            element.second.changeID(i);
+        }
+    }
+    this->counter--;
+    nvsSaveU8(medCntKey, counter);
 }
 
-void Profiles::deleteAllProfiles() {
-	for (int i = 1; i <= this->counter; i++) {
-		getProfileById(i).~Profile();
-	}
-	profilesMap.clear();
-	nvsSaveU8(nvsConf.profileCounter.key, 0);
+void Medicines::deleteAllMedicines()
+{
+    for (std::pair<char *, Medicine> element : medicinesMap)
+    {
 
+        element.second.~Medicine();
+    }
+    medicinesMap.clear();
+    nvsSaveU8(medCntKey, 0);
 }
