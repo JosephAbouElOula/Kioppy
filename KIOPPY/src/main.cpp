@@ -12,8 +12,9 @@
 #include "Nextion\Nextion.h"
 #include <NTPClient.h>
 #include <Preferences.h> // WiFi storage
-#include "WiFi/WiFi.h"
+#include "WiFi\WiFi.h"
 #include "NVS\KIOPPY_NVS.h"
+#include "Medicine\Medicine.h"
 #include "time.h"
 /*
  * Defines
@@ -27,12 +28,13 @@ QueueHandle_t mqttQ;
 bool fanOn = false;
 bool blwrEnable = false;
 bool cancelScan = false;
+Medicines *allMedicines= new Medicines();
 /*
 * Local Variables
 */
-const char *ssid = "hs1";
-const char *wpassword = "1122334400";
 const int dhtTimeOut = 30000;
+// char* wifiSSID="hs1";
+// char* wifiPassword="0011223344";
 
 const int ntpTimeout = 15000;
 const int wifiTimeout = 20000;
@@ -257,7 +259,7 @@ void monitoringTask(void *pvParameters)
           Log.verbose("Trying to reconnect" CR);
           wifiReconnectReady = false;
           xTimerStart(wifiReconnectTimer, 0);
-          WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
+          WiFi.begin(nvsConf.wifiSSID.value, nvsConf.wifiPassword.value);
         }
         break;
 
@@ -323,25 +325,14 @@ void setup()
   Log.setPrefix(printTimestamp);
 
   nvsInit();
-  nvsGetConf(&nvsConf);
-
   hardwareInit();
+
+  allMedicines->loadMedicines();
+// allMedicines->deleteAllMedicines();
+  allMedicines->listMedicines();
+ 
   // writeStringToEEPROM(6,"hs1");
   // writeStringToEEPROM(40,"1122334400");
-
-  wifiSSID = nvsConf.wifiSSID.value;
-  wifiPassword =  nvsConf.wifiPassword.value;
-
-  // Serial.println(wifiPassword);
-  if (wifiSSID == "")
-  {
-    wifiSSID = "hs1";
-  }
-
-  if (wifiPassword == "")
-  {
-    wifiPassword = "1122334400";
-  }
 
   monitoringQ = xQueueCreate(10, sizeof(eventStruct_t));
   mqttQ = xQueueCreate(10, sizeof(mqttStruct_t));
@@ -354,7 +345,7 @@ void setup()
   Log.verbose("Setup Done!" CR);
   // Serial.println(wifiPassword);
   // Serial.println(wifiPassword);
-  WiFi.begin(wifiSSID.c_str(), wifiPassword.c_str());
+  WiFi.begin(nvsConf.wifiSSID.value, nvsConf.wifiPassword.value);
   // WiFi.begin("hs1", "1122334400");
   topicName = "Kioppy/" + WiFi.macAddress();
 

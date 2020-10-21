@@ -3,35 +3,9 @@
 #include "KIOPPY_NVS.h"
 #include "nvs.h"
 #include "nvs_flash.h"
+#include "ArduinoLog.h"
 nvs_handle confNvsHandle;
-
-void nvsInitializeConf(nvsConfig_t *conf)
-{
-        strcpy(conf->blwr.key, "blwr");
-        strcpy(conf->lockCode.key, "code");
-        strcpy(conf->medCnt.key, "medCnt");
-        strcpy(conf->needs_setup.key, "needsSetup");
-        strcpy(conf->wifiPassword.key, "SSID");
-        strcpy(conf->wifiSSID.key, "PWD");
-
-        nvsInitializeConf(&nvsConf);
-}
-void nvsInit()
-{
-        ESP_LOGD(NVS_TAG, "nvsInit");
-        esp_err_t err = nvs_flash_init();
-        if (err == ESP_ERR_NVS_NO_FREE_PAGES)
-        {
-                ESP_LOGE(NVS_TAG, "nvsInit-ERROR initializing nvs");
-                ESP_LOGE(NVS_TAG, "nvsInit-ERROR no free pages, erase flash and retry");
-                // NVS partition was truncated and needs to be erased
-                // Retry nvs_flash_init
-                ESP_ERROR_CHECK(nvs_flash_erase());
-                err = nvs_flash_init();
-        }
-        ESP_ERROR_CHECK(err);
-}
-
+nvsConfig_t nvsConf;
 uint8_t nvsReadOrSetU8(char *key, uint8_t default_value)
 {
         uint8_t temp;
@@ -54,18 +28,7 @@ void nvsReadOrSetStr(char *key, char *value, size_t val_len, char *default_value
         }
 }
 
-void nvsGetConf(nvsConfig_t *conf)
-{
 
-        ESP_LOGD(NVS_TAG, "nvsGetConf");
-        /* Read WiFi configuration */
-        nvsReadOrSetStr(conf->wifiSSID.key, conf->wifiSSID.value, 32, (char *)"hs1");
-        nvsReadOrSetStr(conf->wifiPassword.key, conf->wifiPassword.value, 64, (char *)"123456");
-        /* Read coffee making stage */
-        conf->needs_setup.value = nvsReadOrSetU8(conf->needs_setup.key, 1);
-        conf->blwr.value = nvsReadOrSetU8(conf->blwr.key, 1);
-        conf->medCnt.value = nvsReadOrSetU8(conf->medCnt.key, 0);
-}
 
 esp_err_t nvsReadStr(char *key, char *value, size_t val_len)
 {
@@ -79,7 +42,7 @@ esp_err_t nvsReadStr(char *key, char *value, size_t val_len)
                 err = nvs_get_str(confNvsHandle, key, value, &val_len);
                 if (err != ESP_OK)
                 {
-                        ESP_LOGE(NVS_TAG, "nvsReadStr-Error (%s) when reading", esp_err_to_name(err));
+                        ESP_LOGE(NVS_TAG, "nvsReadStr-Error (%s) when reading %s", esp_err_to_name(err), key);
                 }
                 nvs_close(confNvsHandle);
         }
@@ -186,3 +149,55 @@ void nvsSaveU16(char *key, uint16_t value)
                 nvs_close(confNvsHandle);
         }
 }
+
+
+void nvsInitializeConf(nvsConfig_t *conf)
+{
+        strcpy(conf->blwr.key, "blwr");
+        strcpy(conf->lockCode.key, "code");
+        strcpy(conf->medCnt.key, "medCnt");
+        strcpy(conf->needs_setup.key, "ndsStp");
+        strcpy(conf->wifiPassword.key, "SSID");
+        strcpy(conf->wifiSSID.key, "PWD");
+
+       
+}
+void nvsGetConf(nvsConfig_t *conf)
+{
+        ESP_LOGD(NVS_TAG, "nvsGetConf");
+     
+        nvsReadOrSetStr(conf->wifiSSID.key, conf->wifiSSID.value, 32, (char *)"hs1");
+        nvsReadOrSetStr(conf->wifiPassword.key, conf->wifiPassword.value, 64, (char *)"123456");
+        
+        nvsReadOrSetStr(conf-> lockCode.key, conf->lockCode.value, 5, (char *)"1123");
+        conf->needs_setup.value = nvsReadOrSetU8(conf->needs_setup.key, 1);
+        conf->blwr.value = nvsReadOrSetU8(conf->blwr.key, 1);
+        conf->medCnt.value = nvsReadOrSetU8(conf->medCnt.key, 0);
+
+        Log.verbose("SSID %s" CR, conf->wifiSSID.value);
+        Log.verbose("Password %s" CR, conf->wifiPassword.value);
+        Log.verbose("lockCode %s" CR, conf->lockCode.value);
+
+        Log.verbose("needs_setup %d" CR, conf->needs_setup.value);
+        Log.verbose("medicine %d" CR, conf->medCnt.value);
+        Log.verbose("blower %d" CR, conf->blwr.value);
+
+}
+void nvsInit()
+{
+        Log.verbose("NVS Init!" CR);
+        esp_err_t err = nvs_flash_init();
+        if (err == ESP_ERR_NVS_NO_FREE_PAGES)
+        {
+                ESP_LOGE(NVS_TAG, "nvsInit-ERROR initializing nvs");
+                ESP_LOGE(NVS_TAG, "nvsInit-ERROR no free pages, erase flash and retry");
+                // NVS partition was truncated and needs to be erased
+                // Retry nvs_flash_init
+                ESP_ERROR_CHECK(nvs_flash_erase());
+                err = nvs_flash_init();
+        }
+        ESP_ERROR_CHECK(err);
+         nvsInitializeConf(&nvsConf);
+         nvsGetConf(&nvsConf);
+}
+

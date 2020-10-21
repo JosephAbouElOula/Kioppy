@@ -6,6 +6,7 @@
 #include "Hardware/Hardware.h"
 #include "Nextion.h"
 #include "NVS/KIOPPY_NVS.h"
+#include "Medicine/Medicine.h"
 
 // #define LCD_SERIAL UART_NUM_1
 #define LCD_SERIAL Serial1
@@ -32,40 +33,6 @@ void setLockCode(String code)
 	lockCode = code;
 }
 
-// static void lcd_uart_rx_task(void *pvParameters)
-// {
-
-// 	uart_event_t event;
-// 	static char data[LCD_UART_BUFFER_SIZE] = {0};
-
-// 	while (1)
-// 	{
-// 		if (xQueueReceive(lcdUartRxQueue, (void *)&event, (portTickType)portMAX_DELAY))
-// 		{
-// 			Log.verbose("msg Received" CR);
-// 			/*	uart_read_bytes(STM_UART_NUM, (uint8_t*) data, STM_UART_BUFFER_SIZE, 2 / portTICK_RATE_MS);
-// 			// Log anything received before it is decoded
-// 			ESP_LOGV(STM_TAG, "received: 0x %.2hhx %.2hhx %.2hhx %.2hhx %.2hhx %.2hhx %.2hhx %.2hhx",
-// 					data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
-// 			decodeFrame(data);*/
-// 		}
-// 	}
-// }
-
-// static void lcd_uart_tx_task(void *pvParameters)
-// {
-
-// 	//stmUartFrame_t message;
-
-// 	while (1)
-// 	{
-// 		//if (xQueueReceive(lcdUartTxQueue, (void*)&message, (portTickType)portMAX_DELAY)) {
-
-// 		//	lcdUartTransmit(message.command, (void*)message.payload.b, message.payloadSize);
-// 		//	if (message.blocking) lcdUartTxBlocking--;
-// 		//}
-// 	}
-// }
 void lcdSendCommand(String str)
 {
 	Log.verbose("Message to Send %s" CR, str.c_str()); // + String ((char) 0xFF + (char) 0xFF + (char) 0xFF ));
@@ -170,6 +137,19 @@ static void lcd_uart_Queue_task(void *pvParameters)
 				{
 					//Add Med
 					scannedMed = PUT_MED_SCANNED;
+					Medicine *med = NULL;
+					Barcode = strData.substring(2, strData.length() - 1);
+					Log.verbose("BARCODE is %s" CR, (char *)Barcode.c_str());
+					if (allMedicines->getMedicineByBarcode((char *)Barcode.c_str(), *med) == 1)
+					{
+						//medicine found
+						Log.error("BARCODE found");
+					}
+					else
+					{
+						//Medicine not found
+						lcdSendCommand("page MedNotFound");
+					}
 				}
 				else if (strData.charAt(1) == 'T')
 				{
@@ -177,25 +157,55 @@ static void lcd_uart_Queue_task(void *pvParameters)
 					scannedMed = TAKE_MED_SCANNED;
 				}
 				Barcode = strData.substring(2, strData.length() - 1);
+				Medicine *med = NULL;
+				if (allMedicines->getMedicineByBarcode((char *)Barcode.c_str(), *med) == 1)
+				{
+					//medicine found
+					if (scannedMed == TAKE_MED_SCANNED)
+					{
+						if (med->getType() == PILLS)
+						{
+							lcdSendCommand("TakeMed.v_type.val=0");
+						}
+						else
+						{
+							lcdSendCommand("TakeMed.v_type.val=1");
+						}
+						lcdSendCommand("TakeMed.v_name.txt=\"" + (String)med->getDescription() + "\"");
+						//  vTaskDelay(pdMS_TO_TICKS(50));
+						lcdSendCommand("page TakeMed");
+					}
+					else if (scannedMed == PUT_MED_SCANNED)
+					{
+						lcdSendCommand("ExpDate.t_name.txt=\"" + (String)med->getDescription() + "\"");
+						lcdSendCommand("page ExpDate");
+					}
+				}
+				else
+				{
+					//Medicine not found
+				}
 
-				mqttStruct_t getMedName;
-				getMedName.msgType = SCAN_MED;
-				getMedName.barcode = Barcode;
-				xQueueSendToBack(mqttQ, &getMedName, pdMS_TO_TICKS(500));
+				// mqttStruct_t getMedName;
+				// getMedName.msgType = SCAN_MED;
+				// getMedName.barcode = Barcode;
+				// xQueueSendToBack(mqttQ, &getMedName, pdMS_TO_TICKS(500));
 			}
 
 			else if (strData.charAt(0) == 'W')
 			{
 				//SSID
-				wifiSSID = strData.substring(1);
+				// wifiSSID = strData.substring(1).c_str();
+				strcpy(nvsConf.wifiSSID.value, strData.substring(1).c_str());
 			}
 			else if (strData.charAt(0) == 'P')
 			{
 				//Wifi Password
-				wifiPassword = strData.substring(1);
+				// wifiPassword = strData.substring(1);
+				strcpy(nvsConf.wifiPassword.value, strData.substring(1).c_str());
 
-				nvsSaveStr(nvsConf.wifiSSID.key, wifiSSID.c_str());
-				nvsSaveStr(nvsConf.wifiPassword.key, wifiPassword.c_str());
+				nvsSaveStr(nvsConf.wifiSSID.key, nvsConf.wifiSSID.value);
+				nvsSaveStr(nvsConf.wifiPassword.key, nvsConf.wifiPassword.value);
 
 				monitoringQueueAdd(WIFI_RECOONECT_EVT);
 				// WiFi.begin(SSID.c_str(), PWD.c_str());
@@ -203,8 +213,8 @@ static void lcd_uart_Queue_task(void *pvParameters)
 			else if (strData.charAt(0) == 'F')
 			{
 				//Factory Reset
-				nvsSaveU8(nvsConf.blwr.key,1);
-				nvsSaveU8(nvsConf.needs_setup.key,1);
+				nvsSaveU8(nvsConf.blwr.key, 1);
+				nvsSaveU8(nvsConf.needs_setup.key, 1);
 				ESP.restart();
 			}
 			else if (strData.charAt(0) == 'B')
@@ -212,12 +222,12 @@ static void lcd_uart_Queue_task(void *pvParameters)
 				//Blower
 				if (strData.charAt(1) == 'E')
 				{
-					nvsSaveU8(nvsConf.blwr.key,1);
+					nvsSaveU8(nvsConf.blwr.key, 1);
 					blwrEnable = 1;
 				}
 				else
 				{
-					nvsSaveU8(nvsConf.blwr.key,0);
+					nvsSaveU8(nvsConf.blwr.key, 0);
 					blwrEnable = 0;
 					turnFanOff();
 				}
@@ -230,170 +240,33 @@ static void lcd_uart_Queue_task(void *pvParameters)
 			else if (strData.charAt(0) == 'X')
 			{
 				//New Medicine
-				mqttStruct_t notFoundMed;
-				notFoundMed.msgType = NEW_MED;
-				notFoundMed.barcode = Barcode;
-				if (strData.charAt(1) == '1')
-				{
-					notFoundMed.form = "pills";
-				}
-				else
-				{
-					notFoundMed.form = "syrup";
-				}
-				notFoundMed.expDate = strData.substring(2, 10);
-				notFoundMed.name = strData.substring(10);
-				xQueueSendToBack(mqttQ, &notFoundMed, pdMS_TO_TICKS(500));
+				MedicineParams_t med = {};
+				strcpy(med.barcode, Barcode.c_str());
+				strcpy(med.description, strData.substring(10).c_str());
+				med.type = strData.charAt(1);
+				med.qty = 100;
+				Log.verbose("Adding Medicines" CR);
+				Log.verbose("-->Barcode: %s" CR, med.barcode);
+				Log.verbose("-->description: %s" CR, med.description);
+				allMedicines->createNewMedicine(&med);
+				allMedicines->listMedicines();
+				// mqttStruct_t notFoundMed;
+				// notFoundMed.msgType = NEW_MED;
+				// notFoundMed.barcode = Barcode;
+				// if (strData.charAt(1) == '1')
+				// {
+				// 	notFoundMed.form = "pills";
+				// }
+				// else
+				// {
+				// 	notFoundMed.form = "syrup";
+				// }
+				// notFoundMed.expDate = strData.substring(2, 10);
+				// notFoundMed.name = strData.substring(10);
+				// xQueueSendToBack(mqttQ, &notFoundMed, pdMS_TO_TICKS(500));
 			}
 		}
 	}
-
-	// switch (strData.charAt(0))
-	// {
-	// case 'M':
-	// {
-	// 	// Main Screen
-	// 	nextScreen = strData.charAt(1);
-
-	// 	if (nextScreen == 'C')
-	// 	{
-	// 		//Change Code screen
-	// 		lcdSendCommand("page 1");
-	// 	}
-	// 	else if (nextScreen == 'W')
-	// 	{
-	// 		// monitoringQueueAdd(CHANGE_WIFI);
-	// 	}
-	// 	else
-	// 	{
-	// 		if (doorIsOpen())
-	// 		{
-	// 			if (nextScreen == 'T')
-	// 			{
-	// 				lcdSendCommand("page Take_Med");
-	// 			}
-	// 			else if (nextScreen == 'A')
-	// 			{
-	// 				lcdSendCommand("page Add_Med");
-	// 			}
-	// 			else
-	// 			{
-	// 				Log.error("Unknown Command from Nextion");
-	// 			}
-	// 		}
-	// 		else
-	// 		{
-	// 			//Door is closed
-	// 			lcdSendCommand("page 1");
-	// 		}
-	// 	}
-	// 	break;
-	// }
-
-	// case 'C':
-	// {
-	// 	/* code */
-	// 	if (nextScreen == 'C')
-	// 	{
-	// 		//change code
-	// 		if (intNewCode == 0)
-	// 		{
-	// 			lcdSendCommand("t5.txt=\"Enter your new Code and press 'OK'\"");
-	// 			lcdSendCommand("t0.txt=\"\"");
-	// 			intNewCode++;
-	// 		}
-	// 		else if (intNewCode == 1)
-	// 		{
-	// 			lcdSendCommand("t5.txt=\"Re-enter your new Code and press 'OK'\"");
-	// 			lcdSendCommand("t0.txt=\"\"");
-	// 			newCode = strData.substring(1);
-	// 			Log.verbose("New Code %s" CR, newCode.c_str());
-	// 			intNewCode++;
-	// 		}
-	// 		else if (intNewCode == 2)
-	// 		{
-	// 			Log.verbose("Pftt %s, %s" CR, newCode, strData.substring(1).c_str());
-	// 			if (strData.substring(1).equals(newCode))
-	// 			{
-	// 				//code was changed
-	// 				lcdSendCommand("page Code_Changed");
-	// 				setLockCode(newCode);
-	// 				intNewCode = 0;
-	// 			}
-	// 			else
-	// 			{
-	// 				Log.verbose("New Code %s" CR, strData.substring(1).c_str());
-	// 				lcdSendCommand("page Code_Error");
-	// 				// lcdSendCommand("t0.txt=\"Codes do not match!\"");
-	// 			}
-	// 		}
-	// 	}
-	// 	else if (strData.substring(1).equals(lockCode))
-	// 	{
-	// 		//Code is correct
-
-	// 		if (nextScreen == 'A')
-	// 		{
-	// 			unlockDoor();
-	// 			lcdSendCommand("page Add_Med");
-	// 		}
-	// 		else if (nextScreen == 'T')
-	// 		{
-	// 			unlockDoor();
-	// 			lcdSendCommand("page Take_Med");
-	// 		}
-	// 	}
-	// 	else
-	// 	{
-
-	// 		lcdSendCommand("t0.txt=\"\"");
-	// 		lcdSendCommand("va1.val=0");
-	// 		// lcdSendCommand("va0.txt=\"C" + (String)strData.charAt(1) + "\"");
-	// 		lcdSendCommand("vis t1,1");
-	// 	}
-	// 	break;
-	// }
-
-	// case 'A':
-	// {
-	// 	Barcode = strData.substring(1, strData.indexOf(';') - 1);
-	// 	expDate = (strData.substring(strData.indexOf(';') + 1));
-	// 	// Log.verbose("Index %d" CR, strData.indexOf(';'));
-	// 	// Log.verbose("exp Date %s" CR,strData.substring(strData.indexOf(';') + 1));
-	// 	mqttStruct_t putMedicine;
-	// 	putMedicine.msgType = PUT_MED; //msgType
-	// 	// strcpy(putMedicine.barcode, Barcode.c_str()); //barcode
-	// 	// strcpy(putMedicine.expDate, expDate.c_str()); //expDate
-	// 	putMedicine.barcode = Barcode;
-	// 	putMedicine.expDate = expDate;
-	// 	xQueueSendToBack(mqttQ, &putMedicine, portMAX_DELAY);
-	// 	break;
-	// }
-
-	// case 'T':
-	// {
-	// 	Barcode = strData.substring(1, strData.indexOf(';') - 1);
-	// 	qty = (strData.substring(strData.indexOf(';') + 1)).toInt();
-	// 	mqttStruct_t takeMedicine;
-	// 	takeMedicine.msgType = TAKE_MED; //msgType
-	// 	// strcpy(takeMedicine.barcode, Barcode.c_str()); //barcode
-	// 	takeMedicine.barcode = Barcode;
-	// 	takeMedicine.qty = qty;
-	// 	xQueueSendToBack(mqttQ, &takeMedicine, portMAX_DELAY);
-	// 	break;
-	// }
-
-	// case 'S':
-	// {
-	// 	//Smart Config Stop
-	// 	boolSmartConfigStop = true;
-	// 	break;
-	// }
-	// default:
-	// {
-	// 	break;
-	// }
-	// }
 }
 
 static void readLCDSerial(void *pvParameters)
@@ -418,33 +291,23 @@ void nextionUartInit(void)
 	lcdUartRxQueue = xQueueCreate(10, 50);
 	lcdUartTxQueue = xQueueCreate(10, 30);
 	xTaskCreate(readLCDSerial, "LCD_UART_RX", configMINIMAL_STACK_SIZE * 3, NULL, 5, NULL);
-	xTaskCreate(lcd_uart_Queue_task, "lcd_uart_Queue_task", 2048, NULL, LCD_TRANSMIT_TASK_PRIORITY, &lcdUartRxHandle);
+	xTaskCreate(lcd_uart_Queue_task, "lcd_uart_Queue_task", 4096, NULL, LCD_TRANSMIT_TASK_PRIORITY, &lcdUartRxHandle);
 	xTaskCreate(lcd_uart_tx_task, "lcd_uart_tx_task", 2048, NULL, LCD_TRANSMIT_TASK_PRIORITY, &lcdUartTxHandle);
 
-	uint8_t needs_setup =nvsConf.needs_setup.value;
 	lcdSendCommand("rest");
 	vTaskDelay(pdMS_TO_TICKS(150));
-	Log.verbose("Needs Setup %d" CR, needs_setup);
-	if (needs_setup == 255)
-	{
-		//EEPROM is empty
-		needs_setup = 1;
-	}
-	Log.verbose("Needs Setup %d" CR, needs_setup);
+	Log.verbose("Needs Setup %d" CR, nvsConf.needs_setup.value);
 
-	lcdSendCommand("needs_setup.val=" + String(needs_setup));
+	lcdSendCommand("needs_setup.val=" + String(nvsConf.needs_setup.value));
 	vTaskDelay(pdMS_TO_TICKS(350));
-	lcdSendCommand("needs_setup.val=" + String(needs_setup));
+	lcdSendCommand("needs_setup.val=" + String(nvsConf.needs_setup.value));
 	vTaskDelay(pdMS_TO_TICKS(150));
-	if (!needs_setup)
+	if (!nvsConf.needs_setup.value)
 	{
 		//read the stored code in the EEPROM
-		lockCode=nvsConf.lockCode.value;
-		if (lockCode == "")
-		{
-			setLockCode("1234");
-		}
-		lcdSendCommand("lock_code.txt=\"" + lockCode + "\"");
+		String tmp = nvsConf.lockCode.value;
+
+		lcdSendCommand("lock_code.txt=\"" + tmp + "\"");
 
 		if (doorIsOpen())
 		{

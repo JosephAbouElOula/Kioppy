@@ -3,8 +3,6 @@
 #include "ArduinoLog.h"
 #include "NVS\KIOPPY_NVS.h"
 
-nvsConfig_t nvsConf;
-
 uint8_t Medicines::counter = 0;
 Medicine::Medicine(uint8_t ID)
 {
@@ -28,6 +26,7 @@ Medicine::Medicine(MedicineParams_t *medParams, uint8_t ID, bool saveToNvs)
 {
     this->ID = ID;
     updateKeys();
+    Log.error("Barcode Before Saving: %s" CR, medParams->barcode );
     setBarcode(medParams->barcode, saveToNvs);
     setDescription(medParams->description, saveToNvs);
     setQty(medParams->qty, saveToNvs);
@@ -61,7 +60,9 @@ void Medicine::updateKeys()
 }
 void Medicine::setBarcode(char *barcode, bool saveToNvs)
 {
+    Log.error("Barcode Before Saving in fnct 1 : %s" CR, barcode );
     strcpy(this->barcode, barcode);
+       Log.error("Barcode Before Saving in fnct 2 : %s" CR, this->barcode );
     if (saveToNvs)
     {
         nvsSaveStr(nvsBarcodeKey, this->barcode);
@@ -123,20 +124,22 @@ void Medicine::getParameters(MedicineParams_t *mp)
     strcpy(mp->description, getDescription());
 }
 
-void Medicines::createNewMedicine(char *barcode)
-{
-    this->counter++;
-    Medicine M(barcode, this->counter);
-    medicinesMap.insert({M.getBarcode(), M});
-}
+// void Medicines::createNewMedicine(char *barcode)
+// {
+//     this->counter++;
+//     Medicine M(barcode, this->counter);
+//     medicinesMap.insert({M.getBarcode(), M});
+// }
 
 uint8_t Medicines::createNewMedicine(MedicineParams_t *medParam)
 {
     this->counter++;
 
     Medicine M(medParam, counter, 1);
-    medicinesMap.insert({M.getBarcode(), M});
-    nvsSaveU8(nvsConf.medCnt.key , counter);
+    Log.error ("Bfore Adding to Map %s" CR, M.getBarcode());
+    // medicinesMap.insert({M.getBarcode(), M});
+    medicinesMap.insert(std::make_pair((char*)"022644002776", M));
+    nvsSaveU8(nvsConf.medCnt.key, counter);
     return this->counter;
 }
 
@@ -145,12 +148,35 @@ void Medicines::loadNewMedicine()
 
     this->counter++;
     Medicine M(this->counter);
+    Log.verbose("Loading Barcode: %s" CR, M.getBarcode() );
     medicinesMap.insert({M.getBarcode(), M});
 }
 
 Medicine Medicines::getMedicineByBarcode(char *barcode)
 {
     return (medicinesMap.find(barcode)->second);
+}
+
+uint8_t Medicines::getMedicineByBarcode(char *barcode, Medicine& med)
+{
+    std::unordered_map<char *, Medicine>::iterator it = medicinesMap.find(barcode);
+    if (it == medicinesMap.end())
+    {
+        return 0;
+    }
+    else
+    {
+        med = it->second;
+        return 1;
+    }
+}
+
+void Medicines::listMedicines(){
+
+     for (auto& x: medicinesMap) {
+         Log.error("Med %s, %s" CR, x.first, x.second.getDescription());
+  }
+
 }
 
 uint8_t Medicines::loadMedicines()
@@ -163,7 +189,7 @@ uint8_t Medicines::loadMedicines()
     {
         loadNewMedicine();
     }
-
+    Log.verbose("Total Loaded Medicines: %d" CR,savedMedCount);
     return savedMedCount;
 }
 

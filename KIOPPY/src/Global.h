@@ -3,13 +3,14 @@
 #include "EspMQTTClient.h"
 #include "esp_log.h"
 
-#define SETUP_ADDRESS 1
-#define LOCK_CODE_ADDRESS 2 //1+1
-#define BLOWER_ADDRESS 7 //2+4
-#define SSID_ADDRESS 10
-#define PASSWORD_ADDRESS 50
+// #define SETUP_ADDRESS 1
+// #define LOCK_CODE_ADDRESS 2 //1+1
+// #define BLOWER_ADDRESS 7 //2+4
+// #define SSID_ADDRESS 10
+// #define PASSWORD_ADDRESS 50
 
-
+#define PILLS 0
+#define SYRUP 1
 extern bool blwrEnable; 
 extern bool cancelScan;
 typedef enum
@@ -36,8 +37,8 @@ extern QueueHandle_t monitoringQ;
 
 extern bool fanOn;
 
-extern String wifiSSID;
-extern String wifiPassword;
+extern  char* wifiSSID;
+extern  char* wifiPassword;
 
 extern EspMQTTClient client;
 

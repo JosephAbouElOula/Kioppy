@@ -46,14 +46,20 @@ private:
 class Medicines{
     public:
         uint8_t loadMedicines();
-        void createNewMedicine(char *barcode);
+        // void createNewMedicine(char *barcode);
+        void listMedicines();
         uint8_t createNewMedicine(MedicineParams_t *medParams);
         void loadNewMedicine();
         Medicine getMedicineByBarcode(char* barcode);
+        uint8_t getMedicineByBarcode(char* barcode, Medicine& med);
         void deleteAllMedicines();
         void deleteMedicine(char* barcode);
+        std::unordered_map<char*, Medicine> medicinesMap;
+        
 private: 
-	std::unordered_map<char*, Medicine> medicinesMap;
+
 	std::unordered_map<uint8_t, Medicine> medicinesIDMap;
 	static uint8_t counter;
 };
+
+extern Medicines *allMedicines;
