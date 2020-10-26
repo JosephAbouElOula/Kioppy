@@ -28,7 +28,7 @@ QueueHandle_t mqttQ;
 bool fanOn = false;
 bool blwrEnable = false;
 bool cancelScan = false;
-Medicines *allMedicines= new Medicines();
+Medicines *allMedicines = new Medicines();
 /*
 * Local Variables
 */
@@ -156,8 +156,10 @@ void monitoringTask(void *pvParameters)
           params.msgType = SENSORS;                      //msgType
           params.humidity = getDhtData().humidity;       //Hum
           params.temperature = getDhtData().temperature; //Temp
-          xQueueSendToBack(mqttQ, &params, pdMS_TO_TICKS(500));
+          mqttSendMessage(params);
+          // xQueueSendToBack(mqttQ, &params, pdMS_TO_TICKS(500));
           // sendDHTtoMqtt = false;
+         
         }
 
         xTimerReset(dhtTimer, 0);
@@ -190,11 +192,12 @@ void monitoringTask(void *pvParameters)
 
         if (millis() - timeSent > 1000)
         {
-          xQueueSendToBack(mqttQ, &door, pdMS_TO_TICKS(500));
+          // xQueueSendToBack(mqttQ, &door, pdMS_TO_TICKS(500));
+          mqttSendMessage(door);
           timeSent = millis();
         }
         // openDoor();
-      Log.verbose("Attach Interrupt" CR);
+        Log.verbose("Attach Interrupt" CR);
         doorIntEn();
         break;
       }
@@ -208,6 +211,8 @@ void monitoringTask(void *pvParameters)
         else
         {
           lcdSendCommand("HomeScreen.v_wifi.val=0");
+          vTaskDelay(pdMS_TO_TICKS(150));
+          lcdSendCommand("HomeScreen.v_mobile.val=0");
           monitoringQueueAdd(WIFI_RECOONECT_EVT);
         }
 
@@ -260,9 +265,31 @@ void monitoringTask(void *pvParameters)
           wifiReconnectReady = false;
           xTimerStart(wifiReconnectTimer, 0);
           WiFi.begin(nvsConf.wifiSSID.value, nvsConf.wifiPassword.value);
+
         }
         break;
 
+      case WIFI_BLOCKING_CONNECT_EVT:
+      {
+        WiFi.disconnect();
+        while(WiFi.status()==WL_CONNECTED); //Wait to disconnect
+        Log.verbose("WiFi Disconnected...");
+        WiFi.begin(nvsConf.wifiSSID.value, nvsConf.wifiPassword.value);
+        unsigned long t = millis();
+          Log.verbose("Trying to Connect ...");
+        while(WiFi.status()!=WL_CONNECTED && millis()-t <10000){
+          //10 secs connecting
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+        Log.verbose("Connected ...");
+        if(WiFi.status()==WL_CONNECTED){
+          lcdSendCommand("page nextPageId");
+        } else {
+          //Wifi Not connected 
+          lcdSendCommand ("page IncPass");
+        }
+      }
+         break;
       case MOBILE_DISCONNECTED_EVT:
         xTimerStart(mobileConnectedTimer, 0);
         lcdSendCommand("HomeScreen.v_mobile.val=0");
@@ -312,6 +339,28 @@ void printTimestamp(Print *_logOutput)
   _logOutput->print(c);
 }
 
+void scanWiFi()
+{
+    WiFi.disconnect();
+        while(WiFi.status()==WL_CONNECTED); //Wait to disconnect
+  Log.verbose("Scanning..." CR);
+  uint8_t n = WiFi.scanNetworks();
+  Log.verbose("Found %d Networks" CR, n);
+  lcdSendCommand("WiFiSSID.v_ssidCnt.val=" + String(n));
+  vTaskDelay(pdMS_TO_TICKS(100));
+  if (n > 0)
+  {
+    String strSSIDs = WiFi.SSID(0);
+    for (int i = 1; i < n; i++)
+    {
+      strSSIDs = strSSIDs + "|" + WiFi.SSID(i);
+    }
+    Log.verbose("Networks: %s" CR, strSSIDs.c_str());
+    lcdSendCommand("WiFiSSID.v_SSID.txt=\"" + strSSIDs + "\"");
+  }
+  lcdSendCommand("page WiFiSSID");
+}
+long t;
 void setup()
 {
   // put your setup code here, to run once:
@@ -321,19 +370,19 @@ void setup()
   {
   }
 
-  Log.begin(LOG_LEVEL_VERBOSE, &Serial);
+  Log.begin(LOG_LEVEL_ERROR, &Serial);
   Log.setPrefix(printTimestamp);
 
   nvsInit();
   hardwareInit();
 
   allMedicines->loadMedicines();
-// allMedicines->deleteAllMedicines();
-  allMedicines->listMedicines();
- 
+  // allMedicines->deleteAllMedicines();
+  // allMedicines->listMedicines();
+
   // writeStringToEEPROM(6,"hs1");
   // writeStringToEEPROM(40,"1122334400");
-
+ 
   monitoringQ = xQueueCreate(10, sizeof(eventStruct_t));
   mqttQ = xQueueCreate(10, sizeof(mqttStruct_t));
   dhtTimer = xTimerCreate("dhtTimer", dhtTimeOut / portTICK_PERIOD_MS, pdFALSE, (void *)0, dhtTimerCallBack);
@@ -341,11 +390,14 @@ void setup()
   wifiReconnectTimer = xTimerCreate("WiFi Timer", wifiTimeout / portTICK_PERIOD_MS, pdFALSE, (void *)0, wifiReconnectTimerCallback);
   mobileConnectedTimer = xTimerCreate("Mobile Timer", mobileTimeout / portTICK_PERIOD_MS, pdFALSE, (void *)0, mobileTimerCallback);
 
-  client.enableDebuggingMessages();
+ 
+  // client.enableDebuggingMessages();
   Log.verbose("Setup Done!" CR);
   // Serial.println(wifiPassword);
   // Serial.println(wifiPassword);
   WiFi.begin(nvsConf.wifiSSID.value, nvsConf.wifiPassword.value);
+  
+
   // WiFi.begin("hs1", "1122334400");
   topicName = "Kioppy/" + WiFi.macAddress();
 
@@ -355,8 +407,10 @@ void setup()
   xTimerStart(dhtTimer, 0);
   vTaskDelay(pdMS_TO_TICKS(250));
   monitoringQueueAdd(DHT_TIMER_EVT);
+  t=millis();
 }
 bool ntpBgun = false;
+
 void loop()
 {
 
@@ -365,13 +419,17 @@ void loop()
   if (!ntpBgun && client.isWifiConnected())
   {
     timeClient.begin();              // init NTP
-    timeClient.setTimeOffset(10800); // 0= GMT, 3600 = GMT+1
+    timeClient.setTimeOffset(7200); // 0= GMT, 3600 = GMT+1
     timeClient.forceUpdate();
     ntpBgun = true;
     monitoringQueueAdd(NTP_TIMER_EVT);
     // xTimerStart(ntpTimer, 0);
   }
-
+  if((millis()-t)>10000)
+{
+t=millis();
+   allMedicines->listMedicines();
+  }
   if (!client.isConnected() && wifiReconnectReady && !wifiMsgQueued)
   {
     wifiMsgQueued = true;

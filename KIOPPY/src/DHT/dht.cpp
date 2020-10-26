@@ -94,6 +94,9 @@ void initDHT(u_char pollingPeriod)
     dhtPeriod = pollingPeriod;
     dhtData.humidity = 0;
     dhtData.temperature = 0;
+    dht.readTemperature();
+     vTaskDelay(150 / portTICK_PERIOD_MS);
+    dht.readHumidity();
     vTaskDelay(150 / portTICK_PERIOD_MS);
     xTaskCreate(readDhtData, "dht_Data", configMINIMAL_STACK_SIZE * 3, NULL, 5, NULL);
 }

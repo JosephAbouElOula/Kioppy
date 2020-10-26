@@ -22,7 +22,8 @@ typedef enum
     NTP_TIMER_EVT,
     WIFI_RECOONECT_EVT,
     MOBILE_DISCONNECTED_EVT,
-    MOBILE_CONNECTED_EVT
+    MOBILE_CONNECTED_EVT,
+    WIFI_BLOCKING_CONNECT_EVT,
 } customEvents_t;
 
 typedef struct
@@ -46,6 +47,7 @@ extern EspMQTTClient client;
 extern void monitoringQueueAdd(customEvents_t monitor);
 void monitoringQueueAddFromISR(customEvents_t event);
 void lcdSendCommand(String str);
+void scanWiFi();
 // extern void setLockCode(String code);
 // extern String lockCode;
 

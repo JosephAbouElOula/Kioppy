@@ -16,6 +16,9 @@ typedef struct
     float qty;
     float humidity;
     float temperature;
+
+    float initQty;
+    uint8_t type;
 } mqttStruct_t;
 
 typedef enum
@@ -31,10 +34,12 @@ typedef enum
     MED_DETAILS,
     PHONE_CONNECTED,
     NEW_MED,
+    DELETE_MED,
+    INVENTORY,
 } mqttMsgType_t;
 
 extern QueueHandle_t mqttQ;
 extern String topicName;
 extern void onConnectionEstablished();
 extern void createMqttTask();
-extern void mqttSendMessage(mqttMsgType_t msgType);
+extern void mqttSendMessage(mqttStruct_t msgType);

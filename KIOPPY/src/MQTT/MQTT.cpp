@@ -3,15 +3,17 @@
 #include "ArduinoLog.h"
 #include "DHT/myDht.h"
 #include "ArduinoJson.h"
-
+#include "Medicine/Medicine.h"
 // char payload[2048] = {0};
-
+uint8_t loopIndex=0;
 //String payload;
 void mqttSendMessage(mqttStruct_t msg)
 {
-    xQueueSendToBack(mqttQ, &msg, pdMS_TO_TICKS(500));
+    if (client.isConnected()){
+        xQueueSendToBack(mqttQ, &msg, pdMS_TO_TICKS(500));
+    }
+   
 }
-
 
 uint8_t jsonDeserializer(const char *jsonStr, const char *barcode, const char *name, const char *type)
 {
@@ -34,8 +36,7 @@ uint8_t jsonDeserializer(const char *jsonStr, const char *barcode, const char *n
 }
 char booltochar[2][6] = {"false", "true"};
 
-
-static void structToJson(mqttStruct_t *msg, char* target)
+static void structToJson(mqttStruct_t *msg, char *target)
 {
 
     String output;
@@ -79,14 +80,14 @@ static void structToJson(mqttStruct_t *msg, char* target)
 
         serializeJson(doc, output);*/
     }
-    else if (msg->msgType==NEW_MED)
+    else if (msg->msgType == NEW_MED)
     {
         target += sprintf(target, "{\"msg_type\": %d,", msg->msgType);
         target += sprintf(target, "\"barcode\": \"%s\",", msg->barcode.c_str());
- target += sprintf(target, "\"name\": \"%s\",", msg->name.c_str());
- target += sprintf(target, "\"type\": \"%s\",", msg->form.c_str());
+        target += sprintf(target, "\"name\": \"%s\",", msg->name.c_str());
+        target += sprintf(target, "\"type\": \"%s\",", msg->form.c_str());
 
-          target += sprintf(target, "\"exp_date\": \"%s\"}", msg->expDate.c_str());
+        target += sprintf(target, "\"exp_date\": \"%s\"}", msg->expDate.c_str());
     }
     else if (msg->msgType == SENSORS)
     {
@@ -120,10 +121,24 @@ static void structToJson(mqttStruct_t *msg, char* target)
         target += sprintf(target, "{\"msg_type\": %d,", msg->msgType);
         target += sprintf(target, "\"barcode\": \"%s\"}", msg->barcode.c_str());
     }
+    else if (msg->msgType == INVENTORY)
+    {
+        // target += sprintf(target, "{\"msg_type\": %d, \"Med\":", msg->msgType);
+          
+        
+        //     target += sprintf(target, "[\"%s\",\"%s\", %.2f,%.2f,%d]}", allMedicines->allMedList[loopIndex].getBarcode(), allMedicines->allMedList[loopIndex].getDescription(),
+        //                       allMedicines->allMedList[loopIndex].getQty()/100.0, allMedicines->allMedList[loopIndex].getInitialQty()/100.0, allMedicines->allMedList[loopIndex].getType());
+    
+     target += sprintf(target, "{\"msg_type\": %d, \"Med\":", msg->msgType);
+     target += sprintf(target, "[\"%s\",\"%s\", %.2f,%.2f,%d]}", msg->barcode.c_str(),  msg->name.c_str(),
+     msg->qty,  msg->initQty, msg->type);
+    }
+
     // return output;
-    printf("%s", target);
-    fflush(stdout);
+    // printf("%s", target);
+    // fflush(stdout);
 }
+
 
 void mqttTask(void *pvParameters)
 {
@@ -137,7 +152,7 @@ void mqttTask(void *pvParameters)
             if (xQueueReceive(mqttQ, (void *)&mqttReceive,
                               (portTickType)portMAX_DELAY))
             {
-              char payload[1024] = {0};
+                char payload[2048] = {0};
                 structToJson(&mqttReceive, payload);
 
                 // String p = structToJson(&mqttReceive);
@@ -145,7 +160,7 @@ void mqttTask(void *pvParameters)
                 // Log.verbose("send Serialized Data %S" CR, p.c_str());
                 Log.verbose("send Serialized Data %S" CR, payload);
                 // client.publish(topicName + "/TX", p);
-                client.publish(topicName + "/TX",  payload);
+                client.publish(topicName + "/TX", payload);
                 // vTaskDelay(pdMS_TO_TICKS(100));
                 // client.publish("SmartCabinet/12345/TX", p);
 
@@ -161,9 +176,33 @@ void mqttTask(void *pvParameters)
     }
 }
 
+
+void sendInventoryToMqtt(){
+    Log.error("Sending inventory" CR);
+    allMedicines->sendInventory();
+/*
+
+    
+    for (unsigned int i = 0; i < allMedicines->getCounter() ; ++i)
+    {
+
+           mqttStruct_t inv;
+    inv.msgType=INVENTORY;
+          Log.verbose("Barcode %s:" CR,  allMedicines->allMedList[i].getBarcode());
+            inv.barcode=allMedicines->allMedList[i].getBarcode();
+            Log.verbose("Barcode %s:" CR,  inv.barcode.c_str());
+            inv.name=allMedicines->allMedList[i].getDescription();
+            inv.qty=allMedicines->allMedList[i].getQty()/100.0;
+            inv.initQty=allMedicines->allMedList[i].getInitialQty()/100.0;
+            inv.type=allMedicines->allMedList[i].getType();
+           xQueueSendToBack(mqttQ, &inv, pdMS_TO_TICKS(500));
+               vTaskDelay(1500);
+
+    }*/
+}
 void createMqttTask()
 {
-    xTaskCreate(mqttTask, "mqttTask", 4096, NULL, 5, NULL);
+    xTaskCreate(mqttTask, "mqttTask", 8192, NULL, 5, NULL);
 }
 
 void onConnectionEstablished()
@@ -184,7 +223,7 @@ void onConnectionEstablished()
             const char *barcode = doc["barcode"];
             const char *name = doc["name"];
             const char *type = doc["type"];
-            if (scannedMed == TAKE_MED_SCANNED && cancelScan==false)
+            if (scannedMed == TAKE_MED_SCANNED && cancelScan == false)
             {
                 lcdSendCommand("TakeMed.t_barcode.txt=\"" + (String)barcode + "\"");
                 //  vTaskDelay(pdMS_TO_TICKS(50));
@@ -209,7 +248,7 @@ void onConnectionEstablished()
                 //  vTaskDelay(pdMS_TO_TICKS(50));
                 lcdSendCommand("page TakeMed");
             }
-            else if (scannedMed == PUT_MED_SCANNED && cancelScan==false)
+            else if (scannedMed == PUT_MED_SCANNED && cancelScan == false)
             {
                 if ((String)name == "N/A")
                 {
@@ -232,6 +271,8 @@ void onConnectionEstablished()
     mqttStruct_t con;
     con.msgType = CONNECTED; //msgType
     xQueueSendToBack(mqttQ, &con, pdMS_TO_TICKS(500));
+
+    // sendInventoryToMqtt();
 
     // client.publish(topicName, "Success", true);
 }
