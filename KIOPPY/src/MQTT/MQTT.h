@@ -17,7 +17,7 @@ typedef struct
     float humidity;
     float temperature;
 
-    float initQty;
+    uint16_t initQty;
     uint8_t type;
 } mqttStruct_t;
 

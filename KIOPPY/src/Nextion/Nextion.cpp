@@ -40,7 +40,7 @@ TaskHandle_t lcdUartTxHandle;
 
 String lockCode;
 ScannedMed scannedMed = NO_MED_SCANNED;
-uint8_t medID = 0;
+int8_t medIndex = 0;
 void setLockCode(String code)
 {
 	nvsSaveStr(nvsConf.lockCode.key, code.c_str());
@@ -123,7 +123,7 @@ static void lcd_uart_Queue_task(void *pvParameters)
 			else if (strData.charAt(0) == NEXTION_ADD_MEDICINE)
 			{
 
-				allMedicines->allMedList[medID].setQty(allMedicines->allMedList[medID].getQty() + allMedicines->allMedList[medID].getInitialQty(), 1);
+				allMedicines->allMedList[medIndex].setQty(allMedicines->allMedList[medIndex].getQty() + allMedicines->allMedList[medIndex].getInitialQty(), 1);
 				//Add medicine to the cabinet
 				expDate = strData.substring(1);
 				mqttStruct_t addMed;
@@ -140,7 +140,7 @@ static void lcd_uart_Queue_task(void *pvParameters)
 				//Barcode already sent
 				float tmp = strData.substring(1).toFloat();
 
-				allMedicines->allMedList[medID].setQty(allMedicines->allMedList[medID].getQty() - tmp, 1);
+				allMedicines->allMedList[medIndex].setQty(allMedicines->allMedList[medIndex].getQty() - tmp, 1);
 				// qty = strData.substring(1);
 				tmp = tmp / 100;
 				mqttStruct_t takeMed;
@@ -157,27 +157,20 @@ static void lcd_uart_Queue_task(void *pvParameters)
 				cancelScan = false;
 
 				//Medicine Scanned, waiting for name from Mqtt
-				uint8_t i = 0;
-				bool medFound = false;
+				
+				
 				Barcode = strData.substring(2, strData.length() - 1);
-				for (i = 0; i < allMedicines->getCounter(); ++i)
-				{
-					if (strcmp(allMedicines->allMedList[i].getBarcode(), (char *)Barcode.c_str()) == 0)
-					{
-						Log.verbose("Med Found" CR);
-						medID = i;
-						medFound = true;
-						break;
-					}
-				}
-				if (medFound == true)
+				medIndex=allMedicines->getMedicineIndex((char*) Barcode.c_str());
+
+				
+				if (medIndex >= 0)
 				{
 					if (strData.charAt(1) == NEXTION_ADD_MEDICINE)
 					{
 						//Add Med
 							allMedicines->listMedicines();
 						scannedMed = PUT_MED_SCANNED;
-						lcdSendCommand("ExpDate.t_name.txt=\"" + (String)allMedicines->allMedList[i].getDescription() + "\"");
+						lcdSendCommand("ExpDate.t_name.txt=\"" + (String)allMedicines->allMedList[medIndex].getDescription() + "\"");
 						lcdSendCommand("page ExpDate");
 					}
 					else if (strData.charAt(1) == NEXTION_TAKE_MEDICINE)
@@ -186,7 +179,7 @@ static void lcd_uart_Queue_task(void *pvParameters)
 							allMedicines->listMedicines();
 						scannedMed = TAKE_MED_SCANNED;
 						lcdSendCommand("TakeMed.t_barcode.txt=\"" + (String)Barcode + "\"");
-						if (allMedicines->allMedList[i].getType() == PILLS)
+						if (allMedicines->allMedList[medIndex].getType() == PILLS)
 						{
 							lcdSendCommand("TakeMed.v_type.val=0");
 						}
@@ -194,7 +187,7 @@ static void lcd_uart_Queue_task(void *pvParameters)
 						{
 							lcdSendCommand("TakeMed.v_type.val=1");
 						}
-						lcdSendCommand("TakeMed.v_name.txt=\"" + (String)allMedicines->allMedList[i].getDescription() + "\"");
+						lcdSendCommand("TakeMed.v_name.txt=\"" + (String)allMedicines->allMedList[medIndex].getDescription() + "\"");
 						//  vTaskDelay(pdMS_TO_TICKS(50));
 						lcdSendCommand("page TakeMed");
 						
@@ -203,9 +196,9 @@ static void lcd_uart_Queue_task(void *pvParameters)
 					{
 							allMedicines->listMedicines();
 						//Remove Medicine
-						lcdSendCommand("ConfMed.t_name.txt=\"" + (String)allMedicines->allMedList[i].getDescription() + "\"");
+						lcdSendCommand("ConfMed.t_name.txt=\"" + (String)allMedicines->allMedList[medIndex].getDescription() + "\"");
 						lcdSendCommand("page ConfMed");
-						allMedicines->allMedList[i].setQty(0, 1);
+						allMedicines->allMedList[medIndex].setQty(0, 1);
 						//Remove medicine from the cabinet
 
 						mqttStruct_t removeMedicine;
@@ -220,10 +213,10 @@ static void lcd_uart_Queue_task(void *pvParameters)
 					{
 						allMedicines->listMedicines();
 						//Remove Medicine
-						lcdSendCommand("ConfMed.t_name.txt=\"" + (String)allMedicines->allMedList[i].getDescription() + "\"");
+						lcdSendCommand("ConfMed.t_name.txt=\"" + (String)allMedicines->allMedList[medIndex].getDescription() + "\"");
 						lcdSendCommand("page ConfMed");
 						// allMedicines->allMedList[i].setQty(0, 1);
-						allMedicines->deleteMedicine(i);
+						allMedicines->deleteMedicine(medIndex);
 						//Remove medicine from the cabinet
 
 						mqttStruct_t deleteMed;
@@ -313,8 +306,9 @@ static void lcd_uart_Queue_task(void *pvParameters)
 				String tmp;
 				MedicineParams_t med = {};
 				strcpy(med.barcode, Barcode.c_str());
-				strcpy(med.description, strData.substring(12).c_str());
-				tmp = strData.substring(2, 4).c_str();
+				strcpy(med.description, strData.substring(13).c_str());
+				tmp = strData.substring(2, 5).c_str();
+					Log.verbose("Qty : %s" CR, tmp );
 				med.qty = tmp.toInt()*100;
 				if (strData.charAt(1)=='0'){
 					Log.verbose("type 0");
@@ -323,7 +317,7 @@ static void lcd_uart_Queue_task(void *pvParameters)
 					Log.verbose("type 1");
 					med.type=1;
 				}
-				strcpy(med.expDate, strData.substring(4, 12).c_str());
+				strcpy(med.expDate, strData.substring(5, 13).c_str());
 
 				Log.verbose("Adding Medicines" CR);
 				Log.verbose("-->Barcode: %s" CR, med.barcode);
@@ -333,21 +327,22 @@ static void lcd_uart_Queue_task(void *pvParameters)
 				Log.verbose("-->Type: %d" CR, med.type);
 				allMedicines->createNewMedicine(&med);
 				allMedicines->listMedicines();
-				mqttStruct_t notFoundMed;
-				notFoundMed.msgType = NEW_MED;
-				notFoundMed.barcode = Barcode;
+				mqttStruct_t newMed;
+				newMed.msgType = NEW_MED;
+				newMed.barcode = Barcode;
 				if (strData.charAt(1) == '0')
 				{
-					notFoundMed.form = "pills";
+					newMed.form = "pills";
 				}
 				else
 				{
-					notFoundMed.form = "syrup";
+					newMed.form = "syrup";
 				}
-				notFoundMed.expDate = med.expDate;
-				notFoundMed.name = med.description;
-				notFoundMed.qty=med.qty;
-				xQueueSendToBack(mqttQ, &notFoundMed, pdMS_TO_TICKS(500));
+				newMed.expDate = med.expDate;
+				newMed.name = med.description;
+				newMed.initQty=med.qty;
+				// xQueueSendToBack(mqttQ, &newMed, pdMS_TO_TICKS(500));
+				mqttSendMessage(newMed);
 			}
 		}
 	}

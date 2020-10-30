@@ -5,14 +5,14 @@
 #include "ArduinoJson.h"
 #include "Medicine/Medicine.h"
 // char payload[2048] = {0};
-uint8_t loopIndex=0;
+uint8_t loopIndex = 0;
 //String payload;
 void mqttSendMessage(mqttStruct_t msg)
 {
-    if (client.isConnected()){
+    if (client.isConnected())
+    {
         xQueueSendToBack(mqttQ, &msg, pdMS_TO_TICKS(500));
     }
-   
 }
 
 uint8_t jsonDeserializer(const char *jsonStr, const char *barcode, const char *name, const char *type)
@@ -86,7 +86,7 @@ static void structToJson(mqttStruct_t *msg, char *target)
         target += sprintf(target, "\"barcode\": \"%s\",", msg->barcode.c_str());
         target += sprintf(target, "\"name\": \"%s\",", msg->name.c_str());
         target += sprintf(target, "\"type\": \"%s\",", msg->form.c_str());
-
+        target += sprintf(target, "\"qty\": %d,", msg->initQty / 100);
         target += sprintf(target, "\"exp_date\": \"%s\"}", msg->expDate.c_str());
     }
     else if (msg->msgType == SENSORS)
@@ -123,22 +123,27 @@ static void structToJson(mqttStruct_t *msg, char *target)
     }
     else if (msg->msgType == INVENTORY)
     {
-        // target += sprintf(target, "{\"msg_type\": %d, \"Med\":", msg->msgType);
-          
-        
-        //     target += sprintf(target, "[\"%s\",\"%s\", %.2f,%.2f,%d]}", allMedicines->allMedList[loopIndex].getBarcode(), allMedicines->allMedList[loopIndex].getDescription(),
-        //                       allMedicines->allMedList[loopIndex].getQty()/100.0, allMedicines->allMedList[loopIndex].getInitialQty()/100.0, allMedicines->allMedList[loopIndex].getType());
-    
-     target += sprintf(target, "{\"msg_type\": %d, \"Med\":", msg->msgType);
+        target += sprintf(target, "{\"msg_type\": %d, \"Medicines\":[", msg->msgType);
+        if (allMedicines->getCounter() > 0)
+        {
+            target += sprintf(target, "[\"%s\",\"%s\",%.2f,%d,%d]", allMedicines->allMedList[0].getBarcode(), allMedicines->allMedList[0].getDescription(),
+                                  allMedicines->allMedList[0].getQty() / 100.0, allMedicines->allMedList[0].getInitialQty() / 100, allMedicines->allMedList[0].getType());
+            for (int i = 1; i < allMedicines->getCounter(); ++i)
+            {
+                target += sprintf(target, ",[\"%s\",\"%s\",%.2f,%d,%d]", allMedicines->allMedList[i].getBarcode(), allMedicines->allMedList[i].getDescription(),
+                                  allMedicines->allMedList[i].getQty() / 100.0, allMedicines->allMedList[i].getInitialQty() / 100, allMedicines->allMedList[i].getType());
+            }
+        }
+        target += sprintf(target, "]}");
+        /*target += sprintf(target, "{\"msg_type\": %d, \"Med\":", msg->msgType);
      target += sprintf(target, "[\"%s\",\"%s\", %.2f,%.2f,%d]}", msg->barcode.c_str(),  msg->name.c_str(),
-     msg->qty,  msg->initQty, msg->type);
+     msg->qty,  msg->initQty, msg->type);*/
     }
 
     // return output;
     // printf("%s", target);
     // fflush(stdout);
 }
-
 
 void mqttTask(void *pvParameters)
 {
@@ -147,12 +152,13 @@ void mqttTask(void *pvParameters)
     while (1)
     {
         if (client.isConnected())
+
         {
 
             if (xQueueReceive(mqttQ, (void *)&mqttReceive,
                               (portTickType)portMAX_DELAY))
             {
-                char payload[2048] = {0};
+                char payload[4096] = {0};
                 structToJson(&mqttReceive, payload);
 
                 // String p = structToJson(&mqttReceive);
@@ -176,14 +182,13 @@ void mqttTask(void *pvParameters)
     }
 }
 
-
-void sendInventoryToMqtt(){
+void sendInventoryToMqtt()
+{
     Log.error("Sending inventory" CR);
-    allMedicines->sendInventory();
-/*
-
-    
-    for (unsigned int i = 0; i < allMedicines->getCounter() ; ++i)
+    mqttStruct_t inv;
+    inv.msgType = INVENTORY;
+    xQueueSendToBack(mqttQ, &inv, pdMS_TO_TICKS(500));
+    /*   for (unsigned int i = 0; i < allMedicines->getCounter() ; ++i)
     {
 
            mqttStruct_t inv;
@@ -211,8 +216,9 @@ void onConnectionEstablished()
     // Subscribe to "mytopic/test" and display received message to Serial
     client.subscribe(topicName + "/RX", [](const String &payload) {
         // Log.verbose("Payload: %s" CR, payload);
-
+        // const size_t capacity = 3*JSON_ARRAY_SIZE(6) + JSON_OBJECT_SIZE(4) + 350;       //3 arrays(morning, after noon, night) 6 med per array
         const size_t capacity = JSON_OBJECT_SIZE(4) + 150;
+       
         DynamicJsonDocument doc(capacity);
         deserializeJson(doc, payload);
 
@@ -272,7 +278,7 @@ void onConnectionEstablished()
     con.msgType = CONNECTED; //msgType
     xQueueSendToBack(mqttQ, &con, pdMS_TO_TICKS(500));
 
-    // sendInventoryToMqtt();
+    sendInventoryToMqtt();
 
     // client.publish(topicName, "Success", true);
 }

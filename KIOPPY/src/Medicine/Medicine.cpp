@@ -17,6 +17,8 @@ Medicine::Medicine(uint8_t ID)
     // this->description = nvsReadStr(nvsDescKey);
 }
 
+
+
 Medicine::Medicine(char *barcode, uint8_t ID)
 {
     this->ID = ID;
@@ -151,7 +153,7 @@ void Medicine::getParameters(MedicineParams_t *mp)
 
 Medicines::Medicines()
 {
-    allMedList = (Medicine *)malloc(50 * sizeof(Medicines));
+    allMedList = (Medicine *)malloc(50 * sizeof(Medicine));
     loadMedicines();
 }
 uint8_t Medicines::createNewMedicine(MedicineParams_t *medParam)
@@ -175,6 +177,22 @@ void Medicines::loadNewMedicine()
     Log.verbose("Loading Barcode: %s" CR, M.getBarcode());
     allMedList[counter - 1] = M;
     // medicinesMap.insert({M.getBarcode(), M});
+}
+
+int8_t Medicines::getMedicineIndex(char *barcode){
+     Log.verbose("Looking for medicine" CR);
+      for (unsigned i=0; i<counter; ++i)
+    {
+        Log.verbose("Looking for medicine %d" CR, i);
+        if (strcmp(allMedList[i].getBarcode(), barcode) == 0)
+        {
+            Log.verbose("Med Found" CR);
+         return i;
+        }
+       
+    }
+        Log.verbose("Medicine Not Found" CR);
+        return -1; 
 }
 
 // Medicine* Medicines::getMedicineByBarcode(char *barcode)
@@ -273,13 +291,13 @@ void Medicines::deleteMedicine(char *barcode)
     nvsSaveU8(nvsConf.medCnt.key, this->counter);
 }
 
-void Medicines::deleteMedicine(uint8_t id)
+void Medicines::deleteMedicine(uint8_t indx)
 {
 
-    allMedList[id].~Medicine();
-    for (int j = id + 1; j < this->counter; ++j)
+    allMedList[indx].~Medicine();
+    for (int j = indx + 1; j < this->counter; ++j)
     {
-        allMedList[j].changeID(j - 1);
+        allMedList[j].changeID(j);
         allMedList[j - 1] = allMedList[j];
     }
 

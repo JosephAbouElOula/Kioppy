@@ -55,6 +55,7 @@ TimerHandle_t mobileConnectedTimer;
 BaseType_t xHigherPriorityTaskWoken;
 EspMQTTClient client(
     "broker.mqtt-dashboard.com", // MQTT Broker server ip
+    // "5.196.95.208"
     1883,                        // The MQTT port, default to 1883. this line can be omitted
     "Kioppy"                     // Client name that uniquely identify your device
 );
@@ -370,7 +371,7 @@ void setup()
   {
   }
 
-  Log.begin(LOG_LEVEL_ERROR, &Serial);
+  Log.begin(LOG_LEVEL_VERBOSE, &Serial);
   Log.setPrefix(printTimestamp);
 
   nvsInit();
@@ -391,7 +392,7 @@ void setup()
   mobileConnectedTimer = xTimerCreate("Mobile Timer", mobileTimeout / portTICK_PERIOD_MS, pdFALSE, (void *)0, mobileTimerCallback);
 
  
-  // client.enableDebuggingMessages();
+  client.enableDebuggingMessages();
   Log.verbose("Setup Done!" CR);
   // Serial.println(wifiPassword);
   // Serial.println(wifiPassword);
@@ -428,7 +429,7 @@ void loop()
   if((millis()-t)>10000)
 {
 t=millis();
-   allMedicines->listMedicines();
+  //  allMedicines->listMedicines();
   }
   if (!client.isConnected() && wifiReconnectReady && !wifiMsgQueued)
   {

@@ -57,20 +57,20 @@ class Medicines{
         void listMedicines();
         uint8_t createNewMedicine(MedicineParams_t *medParams);
         void loadNewMedicine();
-        Medicine* getMedicineByBarcode(char* barcode);
-        uint8_t getMedicineByBarcode(char* barcode, Medicine& med);
+        int8_t getMedicineIndex(char *barcode);
         void deleteAllMedicines();
         void deleteMedicine(char* barcode);
         void deleteMedicine(uint8_t ID);
         // std::unordered_map<char*, Medicine> medicinesMap;
         // std::vector <Medicine> medList;
-        Medicine* allMedList;
+         Medicine* allMedList;
         uint8_t getCounter();
         void sendInventory();
         
 private: 
     // std::vector <Medicine> medList;
     // std::unordered_map<uint8_t, Medicine> medicinesIDMap;
+   
 	static uint8_t counter;
 };
 
